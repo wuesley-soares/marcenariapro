@@ -1,0 +1,46 @@
+package br.edu.ifpr.marcenariapro.controller;
+
+import java.util.List;
+
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import br.edu.ifpr.marcenariapro.dto.AmbienteRequestDTO;
+import br.edu.ifpr.marcenariapro.dto.AmbienteResponseDTO;
+import br.edu.ifpr.marcenariapro.service.AmbienteService;
+
+@RestController
+@RequestMapping("/ambientes")
+public class AmbienteController {
+
+    private final AmbienteService service;
+
+    public AmbienteController(AmbienteService service) {
+        this.service = service;
+    }
+
+    @PostMapping
+    public ResponseEntity<AmbienteResponseDTO> salvar(
+            @RequestBody AmbienteRequestDTO dto) {
+
+        return ResponseEntity.ok(service.salvar(dto));
+    }
+
+    @GetMapping
+    public ResponseEntity<List<AmbienteResponseDTO>> listar() {
+
+        return ResponseEntity.ok(service.listar());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<AmbienteResponseDTO> buscarPorId(
+            @PathVariable Long id) {
+
+        return ResponseEntity.ok(service.buscarPorId(id));
+    }
+}

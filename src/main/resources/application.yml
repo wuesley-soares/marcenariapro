@@ -1,0 +1,62 @@
+spring:
+  application:
+    name: marcenariapro-backend
+  profiles:
+    active: local
+  jackson:
+    date-format: yyyy-MM-dd
+    time-zone: America/Sao_Paulo
+  servlet:
+    multipart:
+      max-file-size: 25MB
+      max-request-size: 25MB
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:mudar-este-segredo-em-producao-marcenariapro-tcc-ifpr-2026-chave-secreta}
+    expiration-ms: 28800000 # 8 horas
+  upload:
+    dir: ${UPLOAD_DIR:uploads}
+  regras:
+    percentual-pagamento-minimo-producao: 30.0
+    validade-orcamento-dias: 15
+
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+  datasource:
+    url: jdbc:mysql://localhost:3307/marcenariapro?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+    username: marcenaria
+    password: marcenaria123
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
