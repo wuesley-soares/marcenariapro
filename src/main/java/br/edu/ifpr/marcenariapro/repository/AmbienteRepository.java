@@ -6,4 +6,5 @@ import br.edu.ifpr.marcenariapro.entity.Ambiente;
 
 public interface AmbienteRepository extends JpaRepository<Ambiente, Long> {
 
+    long countByProjetoId(Long projetoId);
 }

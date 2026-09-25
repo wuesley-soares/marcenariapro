@@ -238,6 +238,27 @@ assistenciaRepository.save(assistencia);
 
     verificarGarantia(assistencia);
 }
+
+public List<ItemAssistenciaTecnicaResponseDTO> listarMateriais(
+        Long assistenciaId) {
+
+    AssistenciaTecnica assistencia =
+            assistenciaRepository.findById(assistenciaId)
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Assistência técnica não encontrada"));
+
+    return itemAssistenciaRepository
+            .findByAssistenciaId(assistencia.getId())
+            .stream()
+            .map(item -> new ItemAssistenciaTecnicaResponseDTO(
+                    item.getId(),
+                    item.getQuantidade(),
+                    item.getMaterial().getId(),
+                    item.getMaterial().getNome()
+            ))
+            .toList();
+}
  private void verificarGarantia(
         AssistenciaTecnica assistencia) {
 

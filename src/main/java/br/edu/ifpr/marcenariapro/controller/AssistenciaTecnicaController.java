@@ -48,6 +48,12 @@ public class AssistenciaTecnicaController {
 
         return assistenciaService.buscarPorId(id);
     }
+    @GetMapping("/{id}/materiais")
+    public List<ItemAssistenciaTecnicaResponseDTO> listarMateriais(
+        @PathVariable Long id) {
+
+     return assistenciaService.listarMateriais(id);
+    }
 
     @PutMapping("/{id}")
 public AssistenciaTecnicaResponseDTO atualizar(

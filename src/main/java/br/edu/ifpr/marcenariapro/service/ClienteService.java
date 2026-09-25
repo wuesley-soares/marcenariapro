@@ -20,12 +20,59 @@ public class ClienteService {
 
     public ClienteResponseDTO salvar(ClienteRequestDTO dto) {
 
+        String cpfCnpj = dto.cpfCnpj() != null
+        ? dto.cpfCnpj().trim()
+        : null;
+
+        if (dto.nome() == null || dto.nome().isBlank()) {
+    throw new RuntimeException(
+            "O nome do cliente é obrigatório."
+    );
+}
+
+if (dto.email() == null || dto.email().isBlank()) {
+    throw new RuntimeException(
+            "O e-mail do cliente é obrigatório."
+    );
+}
+
+if (!dto.email().contains("@")) {
+    throw new RuntimeException(
+            "O e-mail informado é inválido."
+    );
+}
+
+if (dto.telefone() == null || dto.telefone().isBlank()) {
+    throw new RuntimeException(
+            "O telefone do cliente é obrigatório."
+    );
+}
+
+if (repository.findByEmail(dto.email()).isPresent()) {
+    throw new RuntimeException(
+            "Já existe um cliente cadastrado com este e-mail."
+    );
+}
+
+
+        if (dto.cpfCnpj() == null || dto.cpfCnpj().isBlank()) {
+    throw new RuntimeException(
+            "O CPF/CNPJ é obrigatório."
+    );
+}
+
+        if (repository.findByCpfCnpj(dto.cpfCnpj()).isPresent()) {
+    throw new RuntimeException(
+            "Já existe um cliente cadastrado com este CPF/CNPJ."
+    );
+}
+
         Cliente cliente = new Cliente();
 
         cliente.setNome(dto.nome());
         cliente.setEmail(dto.email());
         cliente.setTelefone(dto.telefone());
-        cliente.setCpfCnpj(dto.cpfCnpj());
+        cliente.setCpfCnpj(cpfCnpj);
         cliente.setEndereco(dto.endereco());
 
         Cliente clienteSalvo = repository.save(cliente);
