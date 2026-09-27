@@ -10,6 +10,8 @@ import br.edu.ifpr.marcenariapro.entity.Projeto;
 
 public interface ProjetoRepository extends JpaRepository<Projeto, Long> {
 
+    long countByClienteId(Long clienteId);
+
     @Query("""
         SELECT COALESCE(SUM(o.valor), 0)
         FROM Orcamento o

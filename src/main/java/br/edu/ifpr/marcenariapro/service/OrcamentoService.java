@@ -1,5 +1,6 @@
 package br.edu.ifpr.marcenariapro.service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -88,8 +89,30 @@ public OrcamentoResponseDTO atualizar(
         Orcamento orcamento = orcamentoRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Orçamento não encontrado"));
 
-         Ambiente ambiente = ambienteRepository.findById(dto.ambienteId())
-            .orElseThrow(() -> new RuntimeException("Ambiente não encontrado"));
+ 
+
+            if (!orcamento.getAmbiente().getId().equals(dto.ambienteId())) {
+    throw new RuntimeException(
+            "Não é possível alterar o ambiente de um orçamento existente."
+             );
+            }
+
+            if (dto.valor() == null
+        || dto.valor().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+
+    throw new RuntimeException(
+            "O valor do orçamento deve ser maior que zero."
+    );
+}
+
+            if (dto.status() == StatusOrcamento.APROVADO
+        && orcamento.getDataValidade() != null
+        && LocalDateTime.now().isAfter(orcamento.getDataValidade())) {
+
+    throw new RuntimeException(
+            "Não é possível aprovar um orçamento vencido."
+             );
+            }
 
          if (pedidoRepository.findByOrcamentoId(id).isPresent()
              && orcamento.getStatus() != dto.status()) {
@@ -137,7 +160,7 @@ if (orcamento.getStatus() == StatusOrcamento.RECUSADO
          orcamento.setValor(dto.valor());
         orcamento.setDescricao(dto.descricao());
         orcamento.setStatus(dto.status());
-        orcamento.setAmbiente(ambiente);
+        
 
          Orcamento orcamentoAtualizado = orcamentoRepository.save(orcamento);
 
@@ -166,16 +189,17 @@ public void excluir(Long id) {
 }
 
 
-    private OrcamentoResponseDTO converterParaResponse(Orcamento orcamento) {
+private OrcamentoResponseDTO converterParaResponse(Orcamento orcamento) {
 
-        return new OrcamentoResponseDTO(
-                orcamento.getId(),
-                orcamento.getValor(),
-                orcamento.getDescricao(),
-                orcamento.getStatus(),
-                orcamento.getDataCriacao(),
-                orcamento.getAmbiente().getId(),
-                orcamento.getAmbiente().getNome()
-        );
-    }
+    return new OrcamentoResponseDTO(
+            orcamento.getId(),
+            orcamento.getValor(),
+            orcamento.getDescricao(),
+            orcamento.getStatus(),
+            orcamento.getDataCriacao(),
+            orcamento.getDataValidade(),
+            orcamento.getAmbiente().getId(),
+            orcamento.getAmbiente().getNome()
+    );
+}
 }

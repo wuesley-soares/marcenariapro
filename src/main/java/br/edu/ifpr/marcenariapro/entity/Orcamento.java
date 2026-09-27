@@ -31,12 +31,15 @@ public class Orcamento {
 
     private LocalDateTime dataCriacao;
 
+    private LocalDateTime dataValidade;
+
     @OneToOne
     @JoinColumn(name = "ambiente_id")
     private Ambiente ambiente;
 
-    public Orcamento() {
+   public Orcamento() {
     this.dataCriacao = LocalDateTime.now();
+    this.dataValidade = this.dataCriacao.plusDays(90);
 }
 
     public Long getId() {
@@ -82,6 +85,14 @@ public class Orcamento {
     public void setAmbiente(Ambiente ambiente) {
     this.ambiente = ambiente;
     }
+
+    public LocalDateTime getDataValidade() {
+    return dataValidade;
+}
+
+public void setDataValidade(LocalDateTime dataValidade) {
+    this.dataValidade = dataValidade;
+}
 
 
 }

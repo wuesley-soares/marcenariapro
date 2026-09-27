@@ -12,6 +12,7 @@ public record OrcamentoResponseDTO(
     String descricao,
     StatusOrcamento status,
     LocalDateTime dataCriacao,
+    LocalDateTime dataValidade,
     Long ambienteId,
     String ambienteNome
 

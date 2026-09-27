@@ -78,7 +78,9 @@ public class PagamentoService {
     Pagamento pagamento = new Pagamento();
 
     pagamento.setValor(dto.valor());
+    if (dto.dataPagamento() != null) {
     pagamento.setDataPagamento(dto.dataPagamento());
+}
     pagamento.setDescricao(dto.descricao());
     pagamento.setStatus(dto.status());
     pagamento.setPedido(pedido);

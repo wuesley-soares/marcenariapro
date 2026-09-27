@@ -1,5 +1,7 @@
 package br.edu.ifpr.marcenariapro.service;
 
+import java.util.List;
+
 import org.springframework.stereotype.Service;
 
 import br.edu.ifpr.marcenariapro.dto.ItemProducaoRequestDTO;
@@ -55,4 +57,26 @@ public class ItemProducaoService {
                 salvo.getMaterial().getNome()
         );
     }
+
+    public List<ItemProducaoResponseDTO> listarPorProducao(Long producaoId) {
+
+    Producao producao = producaoRepository.findById(producaoId)
+            .orElseThrow(() ->
+                    new RuntimeException("Produção não encontrada"));
+
+    return itemProducaoRepository.findAll()
+            .stream()
+            .filter(item ->
+                    item.getProducao().getId().equals(producao.getId()))
+            .map(item ->
+                    new ItemProducaoResponseDTO(
+                            item.getId(),
+                            item.getQuantidade(),
+                            item.getMaterial().getId(),
+                            item.getMaterial().getNome()
+                    ))
+            .toList();
+}
+
+    
 }

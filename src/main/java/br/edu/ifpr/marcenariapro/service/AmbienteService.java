@@ -67,17 +67,13 @@ public class AmbienteService {
         return converterParaResponse(ambiente);
     }
 
-    public AmbienteResponseDTO atualizar(
+  public AmbienteResponseDTO atualizar(
         Long id,
         AmbienteRequestDTO dto) {
 
     Ambiente ambiente = ambienteRepository.findById(id)
             .orElseThrow(() ->
                     new RuntimeException("Ambiente não encontrado"));
-
-    Projeto projeto = projetoRepository.findById(dto.projetoId())
-            .orElseThrow(() ->
-                    new RuntimeException("Projeto não encontrado"));
 
     if (dto.nome() == null || dto.nome().isBlank()) {
         throw new RuntimeException(
@@ -87,7 +83,6 @@ public class AmbienteService {
 
     ambiente.setNome(dto.nome());
     ambiente.setDescricao(dto.descricao());
-    ambiente.setProjeto(projeto);
 
     Ambiente ambienteAtualizado =
             ambienteRepository.save(ambiente);

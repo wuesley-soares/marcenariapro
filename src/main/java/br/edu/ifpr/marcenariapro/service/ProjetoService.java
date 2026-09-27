@@ -67,17 +67,13 @@ public ProjetoService(
 
         return converterParaResponse(projeto);
     }
-    public ProjetoResponseDTO atualizar(
+  public ProjetoResponseDTO atualizar(
         Long id,
         ProjetoRequestDTO dto) {
 
     Projeto projeto = projetoRepository.findById(id)
             .orElseThrow(() ->
                     new RuntimeException("Projeto não encontrado"));
-
-    Cliente cliente = clienteRepository.findById(dto.clienteId())
-            .orElseThrow(() ->
-                    new RuntimeException("Cliente não encontrado"));
 
     if (dto.nome() == null || dto.nome().isBlank()) {
         throw new RuntimeException(
@@ -87,14 +83,12 @@ public ProjetoService(
 
     projeto.setNome(dto.nome());
     projeto.setDescricao(dto.descricao());
-    projeto.setCliente(cliente);
 
     Projeto projetoAtualizado =
             projetoRepository.save(projeto);
 
     return converterParaResponse(projetoAtualizado);
 }
-
     public java.math.BigDecimal calcularTotalProjeto(Long projetoId) {
 
     projetoRepository.findById(projetoId)

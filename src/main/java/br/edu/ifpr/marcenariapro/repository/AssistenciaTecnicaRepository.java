@@ -8,5 +8,7 @@ import br.edu.ifpr.marcenariapro.enums.StatusAssistencia;
 public interface AssistenciaTecnicaRepository
         extends JpaRepository<AssistenciaTecnica, Long> {
 
+      long countByClienteId(Long clienteId);
+
     long countByStatus(StatusAssistencia status);
 }

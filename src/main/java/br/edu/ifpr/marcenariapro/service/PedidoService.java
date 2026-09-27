@@ -1,5 +1,6 @@
 package br.edu.ifpr.marcenariapro.service;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -7,10 +8,12 @@ import org.springframework.stereotype.Service;
 import br.edu.ifpr.marcenariapro.dto.PedidoRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.PedidoResponseDTO;
 import br.edu.ifpr.marcenariapro.entity.Orcamento;
+import br.edu.ifpr.marcenariapro.entity.Pagamento;
 import br.edu.ifpr.marcenariapro.entity.Pedido;
 import br.edu.ifpr.marcenariapro.enums.StatusOrcamento;
 import br.edu.ifpr.marcenariapro.enums.StatusPedido;
 import br.edu.ifpr.marcenariapro.repository.OrcamentoRepository;
+import br.edu.ifpr.marcenariapro.repository.PagamentoRepository;
 import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
 
 @Service
@@ -18,14 +21,17 @@ public class PedidoService {
 
     private final PedidoRepository pedidoRepository;
     private final OrcamentoRepository orcamentoRepository;
+    private final PagamentoRepository pagamentoRepository;
 
-    public PedidoService(
-            PedidoRepository pedidoRepository,
-            OrcamentoRepository orcamentoRepository) {
+ public PedidoService(
+        PedidoRepository pedidoRepository,
+        OrcamentoRepository orcamentoRepository,
+        PagamentoRepository pagamentoRepository) {
 
-        this.pedidoRepository = pedidoRepository;
-        this.orcamentoRepository = orcamentoRepository;
-    }
+    this.pedidoRepository = pedidoRepository;
+    this.orcamentoRepository = orcamentoRepository;
+    this.pagamentoRepository = pagamentoRepository;
+}
 
 public PedidoResponseDTO salvar(PedidoRequestDTO dto) {
 
@@ -83,8 +89,7 @@ public PedidoResponseDTO atualizar(
     Pedido pedido = pedidoRepository.findById(id)
             .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
 
-    Orcamento orcamento = orcamentoRepository.findById(dto.orcamentoId())
-            .orElseThrow(() -> new RuntimeException("Orçamento não encontrado"));
+    
             
      if (pedido.getStatus() == br.edu.ifpr.marcenariapro.enums.StatusPedido.ENTREGUE
          && dto.status() != br.edu.ifpr.marcenariapro.enums.StatusPedido.ENTREGUE) {
@@ -157,8 +162,32 @@ if (!pedido.getOrcamento().getId().equals(dto.orcamentoId())) {
     );
 }
 
+if (pedido.getStatus() == StatusPedido.PENDENTE
+        && dto.status() == StatusPedido.EM_PRODUCAO) {
+
+    BigDecimal valorPedido = pedido.getOrcamento().getValor();
+
+    BigDecimal valorMinimoEntrada =
+            valorPedido.multiply(new BigDecimal("0.30"));
+
+    BigDecimal valorPago = pagamentoRepository
+            .findByPedidoId(pedido.getId())
+            .stream()
+            .filter(pagamento ->
+                    pagamento.getStatus() ==
+                    br.edu.ifpr.marcenariapro.enums.StatusPagamento.PAGO)
+            .map(Pagamento::getValor)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+    if (valorPago.compareTo(valorMinimoEntrada) < 0) {
+        throw new RuntimeException(
+                "Não é possível iniciar a produção. "
+                + "O pedido precisa ter pelo menos 30% do valor pago."
+        );
+    }
+}
     pedido.setStatus(dto.status());
-    pedido.setOrcamento(orcamento);
+    
 
     Pedido pedidoAtualizado = pedidoRepository.save(pedido);
 

@@ -47,6 +47,21 @@ public ProducaoResponseDTO salvar(ProducaoRequestDTO dto) {
     Pedido pedido = pedidoRepository.findById(dto.pedidoId())
             .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
 
+            if (pedido.getStatus() == StatusPedido.ENTREGUE
+        || pedido.getStatus() == StatusPedido.CANCELADO) {
+
+    throw new RuntimeException(
+            "Não é possível criar uma produção para um pedido entregue ou cancelado."
+    );
+}
+
+            if (producaoRepository.existsByPedidoId(dto.pedidoId())) {
+    throw new RuntimeException(
+            "Não é possível criar a produção. "
+            + "Este pedido já possui uma produção."
+    );
+}
+
     if (dto.status() != StatusProducao.AGUARDANDO) {
         throw new RuntimeException(
                 "Uma nova produção deve iniciar com o status AGUARDANDO."
@@ -86,8 +101,9 @@ public ProducaoResponseDTO salvar(ProducaoRequestDTO dto) {
         Producao producao = producaoRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Produção não encontrada"));
 
-        Pedido pedido = pedidoRepository.findById(dto.pedidoId())
-                .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
+                Pedido pedido = producao.getPedido();
+
+       
 
                 if (dto.status() == StatusProducao.CANCELADO
         && producao.getStatus() == StatusProducao.EM_PRODUCAO) {
@@ -217,13 +233,24 @@ Producao producaoAtualizada = producaoRepository.save(producao);
         return converterParaResponse(producaoAtualizada);
     }
 
-    public void excluir(Long id) {
+  public void excluir(Long id) {
 
-        Producao producao = producaoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Produção não encontrada"));
+    Producao producao = producaoRepository.findById(id)
+            .orElseThrow(() ->
+                    new RuntimeException("Produção não encontrada"));
 
-        producaoRepository.delete(producao);
+    if (producao.getStatus() == StatusProducao.EM_PRODUCAO
+            || producao.getStatus() == StatusProducao.PRONTO
+            || producao.getStatus() == StatusProducao.ENTREGUE
+            || producao.getStatus() == StatusProducao.CANCELADO) {
+
+        throw new RuntimeException(
+                "Não é possível excluir uma produção que já foi iniciada, concluída ou cancelada."
+        );
     }
+
+    producaoRepository.delete(producao);
+}
 
     private ProducaoResponseDTO converterParaResponse(Producao producao) {
 
