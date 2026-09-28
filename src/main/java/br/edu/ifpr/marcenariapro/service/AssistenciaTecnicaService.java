@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import br.edu.ifpr.marcenariapro.dto.AssistenciaTecnicaRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.AssistenciaTecnicaResponseDTO;
@@ -150,17 +151,33 @@ public AssistenciaTecnicaService(
     return converterParaResponse(atualizada);
 }
 
+@Transactional
+public void excluir(Long id) {
 
-    public void excluir(Long id) {
+    AssistenciaTecnica assistencia =
+            assistenciaRepository.findById(id)
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Assistência técnica não encontrada"));
 
-        AssistenciaTecnica assistencia =
-                assistenciaRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Assistência técnica não encontrada"));
+    List<ItemAssistenciaTecnica> itens =
+            itemAssistenciaRepository
+                    .findByAssistenciaId(assistencia.getId());
 
-        assistenciaRepository.delete(assistencia);
+    for (ItemAssistenciaTecnica item : itens) {
+
+        Material material = item.getMaterial();
+
+        material.setQuantidade(
+                material.getQuantidade() + item.getQuantidade());
+
+        materialRepository.save(material);
     }
+
+    itemAssistenciaRepository.deleteByAssistenciaId(assistencia.getId());
+
+    assistenciaRepository.delete(assistencia);
+}
 
     public ItemAssistenciaTecnicaResponseDTO adicionarMaterial(
         Long assistenciaId,

@@ -6,4 +6,6 @@ import br.edu.ifpr.marcenariapro.entity.SolicitacaoSubstituicao;
 
 public interface SolicitacaoSubstituicaoRepository
         extends JpaRepository<SolicitacaoSubstituicao, Long> {
+
+    boolean existsByNovoMaterialId(Long materialId);
 }

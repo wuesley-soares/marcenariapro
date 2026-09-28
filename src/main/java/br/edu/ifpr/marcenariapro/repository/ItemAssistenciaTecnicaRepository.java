@@ -10,4 +10,6 @@ public interface ItemAssistenciaTecnicaRepository
         extends JpaRepository<ItemAssistenciaTecnica, Long> {
 
     List<ItemAssistenciaTecnica> findByAssistenciaId(Long assistenciaId);
+
+    void deleteByAssistenciaId(Long assistenciaId);
 }

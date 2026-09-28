@@ -39,6 +39,12 @@ public class PagamentoService {
                 "O valor do pagamento deve ser maior que zero");
     }
 
+    if (dto.status() != br.edu.ifpr.marcenariapro.enums.StatusPagamento.PAGO) {
+    throw new RuntimeException(
+            "Um novo pagamento deve ser registrado como PAGO."
+    );
+}
+
     BigDecimal valorPedido = pedido.getOrcamento().getValor();
 
     BigDecimal valorPago = pagamentoRepository

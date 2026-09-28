@@ -19,7 +19,6 @@ import br.edu.ifpr.marcenariapro.repository.PagamentoRepository;
 import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
 import br.edu.ifpr.marcenariapro.repository.ProducaoRepository;
 import br.edu.ifpr.marcenariapro.repository.ProjetoRepository;
-import br.edu.ifpr.marcenariapro.dto.RelatorioAssistenciaResponseDTO;
 
 
 @Service
@@ -62,8 +61,9 @@ public RelatorioService(
     long totalPedidos = pedidoRepository.count();
     long totalAssistencias = assistenciaRepository.count();
 
-    long pedidosEmProducao =
-            producaoRepository.countByStatus(StatusProducao.EM_PRODUCAO);
+        long pedidosEmProducao =
+        pedidoRepository.countByStatus(
+                br.edu.ifpr.marcenariapro.enums.StatusPedido.EM_PRODUCAO);
 
     long pedidosConcluidos =
             producaoRepository.countByStatus(StatusProducao.PRONTO)

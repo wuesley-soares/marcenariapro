@@ -4,5 +4,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import br.edu.ifpr.marcenariapro.entity.MovimentacaoEstoque;
 
-public interface MovimentacaoEstoqueRepository extends JpaRepository<MovimentacaoEstoque, Long> {
+public interface MovimentacaoEstoqueRepository
+        extends JpaRepository<MovimentacaoEstoque, Long> {
+
+    boolean existsByMaterialId(Long materialId);
 }

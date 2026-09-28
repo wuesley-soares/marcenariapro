@@ -1,190 +1,956 @@
 # MarcenariaPro — Backend
 
-Sistema de Gestão para Marcenaria — TCC do curso de Tecnologia em Sistemas para
-Internet/TADS, IFPR Campus Cascavel.
+Sistema de Gestão para Marcenaria — TCC do curso de Tecnologia em Análise e Desenvolvimento de Sistemas (TADS), IFPR Campus Cascavel.
 
-Backend em **Java 21 + Spring Boot 3.3.4**, banco de dados **MySQL 8.4 em Docker**,
-autenticação **JWT** com perfis Administrador/Funcionário, e regras de negócio
-implementadas conforme os Requisitos Funcionais (RF01–RF33) da Especificação de
-Requisitos de Software.
+Backend desenvolvido em **Java 21 + Spring Boot 4.1.0**, banco de dados **MySQL 8.4 em Docker** e autenticação utilizando **JWT**, com perfis de Administrador e Funcionário.
+
+O sistema possui regras de negócio para clientes, projetos, ambientes, orçamentos, pedidos, produção, estoque, pagamentos, assistência técnica, substituição de materiais e relatórios.
 
 ---
 
-## 1. Como executar (Docker — recomendado)
+## 1. Tecnologias utilizadas
 
-Pré-requisito: Docker e Docker Compose instalados.
+- Java 21
+- Spring Boot 4.1.0
+- Spring Data JPA
+- Hibernate
+- Spring Security
+- JWT
+- MySQL 8.4
+- Docker
+- Maven
+- API REST
+
+---
+
+## 2. Como executar
+
+### 2.1 Pré-requisitos
+
+Para executar o projeto é necessário possuir:
+
+- Java 21
+- Docker
+- Docker Compose
+- Git
+- Maven ou Maven Wrapper
+
+O Docker Desktop deve estar em execução.
+
+### 2.2 Banco de dados
+
+O projeto utiliza MySQL 8.4 através do Docker.
+
+Na raiz do projeto, execute:
 
 ```bash
-# na raiz do projeto (onde está o docker-compose.yml)
-docker compose up --build
+docker compose up -d
 ```
 
-Isso vai:
-1. Subir o MySQL 8.4 em um container, na porta `3307` (host) → `3306` (container).
-2. Buildar a aplicação Spring Boot (multi-stage: Maven + JRE Alpine) e subi-la na porta `8080`.
-3. Ao iniciar, o `DataSeeder` cria automaticamente um usuário administrador padrão:
+O banco será iniciado no container:
 
-```
-Email: admin@marcenariapro.com
-Senha: admin123
+```text
+marcenariapro-mysql
 ```
 
-**Altere essa senha imediatamente após o primeiro login** (endpoint de alteração de
-senha está no `UsuarioService`, pode ser exposto via um novo endpoint se desejar).
+Banco de dados:
 
-Para derrubar tudo (mantendo os dados do banco):
+```text
+marcenariapro
+```
+
+Porta:
+
+```text
+3306
+```
+
+Para verificar os containers:
+
+```bash
+docker ps
+```
+
+### 2.3 Executar a aplicação
+
+Com o banco iniciado, execute:
+
+```bash
+./mvnw spring-boot:run
+```
+
+No Windows, também pode ser utilizado:
+
+```powershell
+.\mvnw.cmd spring-boot:run
+```
+
+A aplicação ficará disponível em:
+
+```text
+http://localhost:8080
+```
+
+Para verificar se a aplicação está funcionando:
+
+```bash
+curl http://localhost:8080/
+```
+
+### 2.4 Parar o projeto
+
+Para parar os containers:
+
 ```bash
 docker compose down
 ```
 
-Para derrubar e apagar também os volumes (dados do banco e uploads):
+Esse comando mantém os dados persistidos nos volumes.
+
+Para remover os containers e também os volumes:
+
 ```bash
 docker compose down -v
 ```
 
----
-
-## 2. Como executar localmente (sem Docker, para desenvolvimento)
-
-1. Suba **apenas o banco MySQL** via Docker:
-   ```bash
-   docker compose up -d mysql
-   ```
-2. Rode a aplicação com o profile `local` (já é o padrão no `application.yml`):
-   ```bash
-   mvn spring-boot:run
-   ```
-   A aplicação vai se conectar ao MySQL em `localhost:3307`.
-
-> **Importante**: este projeto foi desenvolvido/gerado em um ambiente sem acesso ao
-> Maven Central, então **não foi possível compilar/testar automaticamente** aqui.
-> Rode `mvn clean compile` (ou abra no IntelliJ/VS Code) na sua máquina antes do
-> primeiro uso. Se aparecer algum erro de compilação, ele deve ser pequeno
-> (import faltando, etc.) — me envie a mensagem de erro que eu corrijo.
+> O comando `docker compose down -v` remove os dados persistidos do banco de dados.
 
 ---
 
 ## 3. Estrutura do projeto
 
-```
-marcenariapro-backend/
-├── docker-compose.yml       # MySQL + aplicação
-├── Dockerfile                # build multi-stage (Maven -> JRE Alpine)
+```text
+marcenariapro/
+├── docker-compose.yml
+├── Dockerfile
 ├── pom.xml
-└── src/main/
-    ├── resources/
-    │   └── application.yml   # profiles: local / docker
-    └── java/com/marcenariapro/
-        ├── model/             # 15 entidades JPA (Usuario, Cliente, Projeto,
-        │   └── enums/         #   Ambiente, Material, Orcamento, ItemOrcamento,
-        │                      #   Pedido, Producao, Pagamento, AssistenciaTecnica,
-        │                      #   MaterialAssistencia, Anexo, Agendamento,
-        │                      #   PagamentoAssistencia) + enums de status
-        ├── repository/        # Spring Data JPA
-        ├── service/           # regras de negócio (RF01-RF33)
-        ├── controller/        # endpoints REST
-        ├── security/          # JwtUtil, JwtAuthFilter
-        ├── config/            # SecurityConfig, DataSeeder
-        ├── dto/                # requests/responses
-        └── exception/          # tratamento global de erros
+└── src/
+    └── main/
+        ├── java/
+        │   └── br/
+        │       └── edu/
+        │           └── ifpr/
+        │               └── marcenariapro/
+        │                   ├── config/
+        │                   ├── controller/
+        │                   ├── dto/
+        │                   ├── entity/
+        │                   ├── enums/
+        │                   ├── repository/
+        │                   ├── security/
+        │                   └── service/
+        │
+        └── resources/
+            └── application.properties
 ```
+
+### Principais pacotes
+
+| Pacote | Função |
+|---|---|
+| `entity` | Entidades utilizadas pelo banco de dados |
+| `repository` | Acesso ao banco de dados através do Spring Data JPA |
+| `service` | Implementação das regras de negócio |
+| `controller` | Endpoints da API REST |
+| `dto` | Objetos utilizados nas requisições e respostas |
+| `security` | Configurações relacionadas à autenticação e segurança |
+| `config` | Configurações gerais da aplicação |
+| `enums` | Enumerações utilizadas pelos módulos |
 
 ---
 
 ## 4. Autenticação
 
+A API utiliza autenticação baseada em **JWT (JSON Web Token)**.
+
+### 4.1 Login
+
+Endpoint:
+
+```http
+POST /auth/login
 ```
-POST /api/auth/login
+
+Exemplo:
+
+```json
 {
-  "email": "admin@marcenariapro.com",
-  "senha": "admin123"
+    "email": "admin@marcenariapro.com",
+    "senha": "admin123"
 }
 ```
-Retorna um `token` JWT. Envie em todas as demais requisições:
-```
+
+Após o login, a API retorna um token JWT.
+
+Esse token deve ser enviado nas requisições protegidas utilizando o cabeçalho:
+
+```text
 Authorization: Bearer <token>
 ```
 
-Cadastro de novo usuário (RF31/RF32):
+---
+
+## 5. Principais endpoints
+
+| Módulo | Endpoint base |
+|---|---|
+| Autenticação | `/auth` |
+| Usuários | `/usuarios` |
+| Clientes | `/clientes` |
+| Projetos | `/projetos` |
+| Ambientes | `/ambientes` |
+| Orçamentos | `/orcamentos` |
+| Pedidos | `/pedidos` |
+| Produção | `/producoes` |
+| Materiais | `/materiais` |
+| Movimentações de estoque | `/movimentacoes-estoque` |
+| Pagamentos | `/pagamentos` |
+| Assistência técnica | `/assistencias-tecnicas` |
+| Substituição de materiais | `/solicitacoes-substituicao` |
+| Relatórios | `/relatorios` |
+
+---
+
+## 6. Clientes
+
+O módulo de clientes permite cadastrar e gerenciar os clientes da marcenaria.
+
+Endpoints:
+
+```http
+POST   /clientes
+GET    /clientes
+GET    /clientes/{id}
+PUT    /clientes/{id}
+DELETE /clientes/{id}
 ```
-POST /api/auth/registrar
-{
-  "nome": "Fulano",
-  "email": "fulano@marcenariapro.com",
-  "senha": "123456",
-  "telefone": "45999999999",
-  "perfil": "FUNCIONARIO"   // ou ADMINISTRADOR
-}
+
+O cadastro possui validações dos principais dados do cliente.
+
+O sistema também verifica os relacionamentos existentes antes de permitir alterações ou exclusões.
+
+---
+
+## 7. Projetos
+
+Os projetos representam os trabalhos realizados para cada cliente.
+
+Endpoints:
+
+```http
+POST   /projetos
+GET    /projetos
+GET    /projetos/{id}
+PUT    /projetos/{id}
+DELETE /projetos/{id}
+GET    /projetos/{id}/total
+```
+
+Um projeto pertence a um cliente e pode possuir vários ambientes.
+
+Exemplo:
+
+```text
+Projeto
+├── Cozinha
+├── Sala
+├── Quarto
+└── Banheiro
+```
+
+Cada ambiente possui seu próprio orçamento.
+
+---
+
+## 8. Ambientes
+
+Os ambientes representam as partes individuais de um projeto.
+
+Endpoints:
+
+```http
+POST   /ambientes
+GET    /ambientes
+GET    /ambientes/{id}
+PUT    /ambientes/{id}
+DELETE /ambientes/{id}
+```
+
+Um ambiente pertence a um projeto.
+
+Podem ser armazenadas informações como:
+
+- nome do ambiente;
+- medidas;
+- observações;
+- imagens;
+- complexidade.
+
+A complexidade do ambiente é utilizada nas regras relacionadas ao orçamento e ao cálculo da mão de obra.
+
+---
+
+## 9. Materiais
+
+O módulo de materiais controla os materiais utilizados pela marcenaria.
+
+Endpoints:
+
+```http
+POST   /materiais
+GET    /materiais
+GET    /materiais/{id}
+PUT    /materiais/{id}
+DELETE /materiais/{id}
+GET    /materiais/estoque-baixo
+```
+
+Os materiais possuem informações como:
+
+- nome;
+- descrição;
+- quantidade;
+- estoque mínimo;
+- valor unitário.
+
+A quantidade em estoque não é alterada diretamente durante uma atualização cadastral.
+
+As alterações de quantidade são realizadas através das movimentações de estoque.
+
+---
+
+## 10. Movimentações de estoque
+
+As movimentações registram entradas e saídas de materiais.
+
+Endpoints:
+
+```http
+POST   /movimentacoes-estoque
+GET    /movimentacoes-estoque
+GET    /movimentacoes-estoque/{id}
+DELETE /movimentacoes-estoque/{id}
+```
+
+Tipos de movimentação:
+
+```text
+ENTRADA
+SAIDA
+```
+
+### Regras
+
+Uma entrada aumenta a quantidade disponível:
+
+```text
+estoque atual + quantidade da entrada
+```
+
+Uma saída reduz a quantidade disponível:
+
+```text
+estoque atual - quantidade da saída
+```
+
+Não é permitida uma saída maior que o estoque disponível.
+
+As movimentações não podem ser excluídas, preservando o histórico das operações.
+
+---
+
+## 11. Orçamentos
+
+O módulo de orçamento permite calcular e controlar os valores dos ambientes.
+
+Endpoints:
+
+```http
+POST   /orcamentos
+GET    /orcamentos
+GET    /orcamentos/{id}
+PUT    /orcamentos/{id}
+DELETE /orcamentos/{id}
+```
+
+Cada ambiente possui seu próprio orçamento.
+
+### Regras principais
+
+- não é permitido criar orçamento duplicado para o mesmo ambiente;
+- o orçamento possui validade;
+- orçamento vencido não pode ser aprovado;
+- orçamento aprovado não pode ser alterado livremente;
+- orçamento aprovado pode gerar pedido;
+- orçamento vinculado a pedido não pode ser excluído;
+- o valor do orçamento deve ser válido;
+- materiais e mão de obra fazem parte da composição do orçamento.
+
+---
+
+## 12. Pedidos
+
+Os pedidos representam os serviços aprovados que serão executados pela marcenaria.
+
+Endpoints:
+
+```http
+POST   /pedidos
+GET    /pedidos
+GET    /pedidos/{id}
+PUT    /pedidos/{id}
+DELETE /pedidos/{id}
+```
+
+Um pedido está relacionado a um orçamento aprovado.
+
+### Regras principais
+
+- somente orçamento aprovado pode gerar pedido;
+- não é permitido criar mais de um pedido para o mesmo orçamento;
+- pedidos possuem controle de status;
+- alterações dependem do status atual;
+- pedidos relacionados a produções iniciadas não podem ser excluídos;
+- pedidos concluídos não podem ser excluídos.
+
+---
+
+## 13. Produção
+
+O módulo de produção controla a execução dos pedidos.
+
+Endpoints:
+
+```http
+POST   /producoes
+GET    /producoes
+GET    /producoes/{id}
+PUT    /producoes/{id}
+DELETE /producoes/{id}
+```
+
+Materiais utilizados na produção:
+
+```http
+POST /producoes/{producaoId}/materiais
+GET  /producoes/{producaoId}/materiais
+```
+
+### Status da produção
+
+```text
+AGUARDANDO
+EM_PRODUCAO
+PRONTO
+ENTREGUE
+CANCELADO
+```
+
+### Regras principais
+
+A produção somente pode ser iniciada após o pagamento de pelo menos **30% do valor do pedido**.
+
+Também é verificada a disponibilidade dos materiais necessários.
+
+Quando um material é utilizado na produção, sua quantidade é retirada do estoque.
+
+Caso uma produção seja cancelada, os materiais utilizados são devolvidos ao estoque.
+
+Produções iniciadas, concluídas ou canceladas não podem ser excluídas.
+
+Quando a produção é marcada como:
+
+```text
+ENTREGUE
+```
+
+o pedido relacionado também passa para:
+
+```text
+ENTREGUE
 ```
 
 ---
 
-## 5. Principais endpoints (visão geral)
+## 14. Pagamentos
 
-| Módulo | Endpoint base | RFs |
-|---|---|---|
-| Autenticação | `/api/auth` | RF31, RF32 |
-| Clientes | `/api/clientes` | RF01 |
-| Projetos | `/api/projetos` | RF02 |
-| Ambientes | `/api/ambientes` | RF03 |
-| Materiais / Estoque | `/api/materiais` | RF04, RF20 |
-| Orçamentos | `/api/orcamentos` | RF05–RF12 |
-| Pedidos | `/api/pedidos` | RF13–RF15, RF23 |
-| Produção | `/api/producao` | RF16–RF19, RF22 |
-| Pagamentos | `/api/pagamentos` | RF21 |
-| Assistência Técnica | `/api/assistencias-tecnicas` | RF25–RF30 |
-| Usuários | `/api/usuarios` (apenas ADMIN) | RF32 |
-| Relatórios | `/api/relatorios` (apenas ADMIN) | RF33 |
+O módulo de pagamentos permite registrar pagamentos relacionados aos pedidos.
 
-### Fluxo típico de uso (ponta a ponta)
-1. `POST /api/clientes` — cadastra cliente (RF01)
-2. `POST /api/projetos/cliente/{clienteId}` — cria projeto (RF02)
-3. `POST /api/ambientes/projeto/{projetoId}` — cria ambiente com complexidade (RF03)
-4. `POST /api/materiais` — cadastra materiais usados (RF04)
-5. `POST /api/orcamentos/ambiente/{ambienteId}` — cria orçamento do ambiente (RF05)
-6. `POST /api/orcamentos/{id}/itens` — adiciona materiais ao orçamento (RF06)
-   — mão de obra (RF07) e valor final (RF09) são calculados automaticamente
-7. `PATCH /api/orcamentos/{id}/margem-lucro` — define margem de lucro (RF08)
-8. `POST /api/orcamentos/{id}/decisao` — aprova/reprova (RF10)
-   — quando **todos** os orçamentos de um projeto são aprovados, um **Pedido é
-   gerado automaticamente** (RF13)
-9. `POST /api/pagamentos/pedido/{pedidoId}` — registra pagamentos (RF21)
-10. `PATCH /api/producao/pedido/{pedidoId}/progresso` — inicia produção
-    (bloqueado até 30% de pagamento confirmado — RF22) e acompanha percentual (RF16)
-11. `POST /api/pedidos/{id}/liberar-entrega` — libera entrega somente após
-    quitação total (RF23)
-12. `POST /api/assistencias-tecnicas` — abre assistência técnica em projeto
-    entregue (RF25), com controle de garantia (RF26), anexos (RF27), materiais
-    usados (RF28), agendamento (RF29) e cobrança fora da garantia (RF30)
+Endpoints:
+
+```http
+POST /pagamentos
+GET  /pagamentos
+GET  /pagamentos/pedido/{pedidoId}
+GET  /pagamentos/pedido/{pedidoId}/resumo
+```
+
+O sistema permite pagamentos parciais e totais.
+
+### Regras principais
+
+- não é permitido pagar um valor superior ao valor do pedido;
+- pagamentos possuem status;
+- pagamentos podem ser registrados com uma data informada;
+- antes da produção é necessário possuir pelo menos 30% do pedido pago;
+- o restante do pagamento pode ser realizado posteriormente;
+- o sistema calcula o valor total recebido e o valor restante.
+
+A entrega não exige que 100% do pedido esteja pago.
+
+O pagamento restante pode ser realizado após a entrega, conforme as regras definidas para o sistema.
 
 ---
 
-## 6. Regras de negócio implementadas (destaques)
+## 15. Assistência técnica
 
-- **RF07** — Mão de obra calculada automaticamente por tabela de complexidade do
-  ambiente (BAIXA/MEDIA/ALTA/MUITO_ALTA) — ver `OrcamentoService.TABELA_MAO_DE_OBRA`.
-  Ajuste os valores conforme a realidade da sua marcenaria.
-- **RF11** — Job agendado (`@Scheduled`, todo dia à 1h) expira orçamentos vencidos
-  automaticamente.
-- **RF13** — Geração automática de pedido quando todos os ambientes de um projeto
-  têm orçamento aprovado.
-- **RF22** — Produção só pode começar após 30% do valor do pedido confirmado
-  (percentual configurável em `application.yml`: `app.regras.percentual-pagamento-minimo-producao`).
-- **RF23** — Entrega só é liberada após quitação total do pedido.
-- **RF30** — Assistências fora da garantia geram cobrança automática (materiais +
-  custo fixo de mão de obra); dentro da garantia, nenhuma cobrança é gerada.
+O módulo de assistência técnica permite registrar problemas relacionados aos pedidos já realizados.
+
+Endpoints:
+
+```http
+POST   /assistencias-tecnicas
+GET    /assistencias-tecnicas
+GET    /assistencias-tecnicas/{id}
+PUT    /assistencias-tecnicas/{id}
+DELETE /assistencias-tecnicas/{id}
+```
+
+### Materiais utilizados
+
+```http
+POST /assistencias-tecnicas/{id}/materiais
+GET  /assistencias-tecnicas/{id}/materiais
+```
+
+A assistência possui informações como:
+
+- cliente;
+- pedido;
+- funcionário responsável;
+- data da solicitação;
+- data de agendamento;
+- descrição;
+- data de entrega original;
+- valor do serviço;
+- valor dos materiais;
+- status.
+
+### Garantia
+
+O sistema verifica o período de garantia utilizando a data de entrega original do pedido.
+
+Dentro do período de garantia, o valor do serviço é zerado.
+
+Os materiais utilizados continuam sendo considerados no cálculo quando aplicável.
+
+Fora da garantia, o serviço pode possuir cobrança de mão de obra e materiais.
+
+Quando uma assistência técnica é excluída, os materiais utilizados nela são devolvidos ao estoque.
 
 ---
 
-## 7. Próximos passos sugeridos para o TCC
+## 16. Solicitação de substituição de materiais
 
-- Ajustar a tabela de custo de mão de obra (RF07) e o custo fixo de mão de obra
-  da assistência técnica (RF30) para valores reais da marcenaria.
-- Escrever testes unitários (JUnit + Mockito) para os services, especialmente
-  `OrcamentoService`, `ProducaoService` e `PagamentoService`, que concentram as
-  regras de negócio mais sensíveis — ótimo material para o capítulo de
-  "Resultados/Testes" do artigo.
-- Rodar `mvn clean compile` localmente para validar a compilação e ajustar
-  eventuais pequenos erros.
-- Conectar o frontend (React + Vite + TypeScript + Tailwind + shadcn/ui +
-  Recharts, já definido em conversas anteriores) a esta API.
+O sistema possui um módulo para controlar solicitações de substituição de materiais.
+
+Endpoints:
+
+```http
+POST /solicitacoes-substituicao
+PUT  /solicitacoes-substituicao/{id}/aprovar
+PUT  /solicitacoes-substituicao/{id}/recusar
+```
+
+A substituição de material depende de aprovação.
+
+Esse controle evita que um material seja substituído durante a produção sem que a alteração seja registrada e aprovada.
+
+---
+
+## 17. Usuários
+
+O sistema possui gerenciamento de usuários e perfis de acesso.
+
+Endpoint base:
+
+```text
+/usuarios
+```
+
+Os principais perfis são:
+
+```text
+ADMINISTRADOR
+FUNCIONARIO
+```
+
+A autenticação é realizada através do módulo de segurança e utiliza JWT.
+
+---
+
+## 18. Relatórios
+
+O sistema possui um módulo de relatórios para apresentar informações consolidadas.
+
+Endpoints:
+
+```http
+GET /relatorios/resumo
+GET /relatorios/estoque
+GET /relatorios/financeiro
+GET /relatorios/producao
+GET /relatorios/pedidos-status
+GET /relatorios/assistencias-status
+```
+
+### 18.1 Resumo
+
+Endpoint:
+
+```http
+GET /relatorios/resumo
+```
+
+Apresenta informações como:
+
+- total de clientes;
+- total de projetos;
+- total de orçamentos;
+- total de pedidos;
+- pedidos em produção;
+- pedidos concluídos;
+- total de assistências;
+- valor total das vendas;
+- valor total recebido.
+
+### 18.2 Estoque
+
+Endpoint:
+
+```http
+GET /relatorios/estoque
+```
+
+Lista materiais que estão com estoque igual ou abaixo do estoque mínimo.
+
+### 18.3 Financeiro
+
+Endpoint:
+
+```http
+GET /relatorios/financeiro
+```
+
+Apresenta, por pedido:
+
+- valor do pedido;
+- valor pago;
+- valor restante;
+- situação do pagamento.
+
+Situações utilizadas:
+
+```text
+PENDENTE
+PARCIALMENTE_PAGO
+PAGO
+```
+
+### 18.4 Produção
+
+Endpoint:
+
+```http
+GET /relatorios/producao
+```
+
+Apresenta a quantidade de produções por status.
+
+### 18.5 Pedidos por status
+
+Endpoint:
+
+```http
+GET /relatorios/pedidos-status
+```
+
+Apresenta a quantidade de pedidos agrupados por status.
+
+### 18.6 Assistências por status
+
+Endpoint:
+
+```http
+GET /relatorios/assistencias-status
+```
+
+Apresenta a quantidade de assistências técnicas agrupadas por status.
+
+---
+
+## 19. Fluxo principal do sistema
+
+O fluxo básico de utilização do MarcenariaPro é:
+
+```text
+Cliente
+   ↓
+Projeto
+   ↓
+Ambientes
+   ↓
+Orçamento de cada ambiente
+   ↓
+Aprovação dos orçamentos
+   ↓
+Pedido
+   ↓
+Pagamento mínimo de 30%
+   ↓
+Produção
+   ↓
+Materiais retirados do estoque
+   ↓
+Produção pronta
+   ↓
+Entrega
+   ↓
+Pagamento restante
+```
+
+Um projeto pode possuir vários ambientes:
+
+```text
+Projeto
+│
+├── Ambiente 1
+│   └── Orçamento 1
+│
+├── Ambiente 2
+│   └── Orçamento 2
+│
+└── Ambiente 3
+    └── Orçamento 3
+```
+
+---
+
+## 20. Principais regras de negócio
+
+Entre as principais regras implementadas estão:
+
+- um cliente pode possuir vários projetos;
+- um projeto pode possuir vários ambientes;
+- cada ambiente possui seu próprio orçamento;
+- não é permitido criar orçamento duplicado para o mesmo ambiente;
+- orçamento vencido não pode ser aprovado;
+- somente orçamento aprovado pode gerar pedido;
+- não é permitido criar pedido duplicado para o mesmo orçamento;
+- produção exige pelo menos 30% do pedido pago;
+- produção verifica a disponibilidade dos materiais;
+- saída de estoque não pode ultrapassar a quantidade disponível;
+- entrada de estoque aumenta a quantidade disponível;
+- saída de estoque reduz a quantidade disponível;
+- movimentações de estoque são mantidas para preservar o histórico;
+- cancelamento da produção devolve materiais ao estoque;
+- produção iniciada ou concluída não pode ser excluída;
+- quando a produção é entregue, o pedido também é marcado como entregue;
+- pagamentos podem ser parciais;
+- não é permitido registrar pagamento superior ao valor do pedido;
+- a entrega não depende da quitação total do pedido;
+- materiais utilizados em assistência são controlados pelo estoque;
+- exclusão de assistência devolve os materiais utilizados ao estoque;
+- substituição de materiais necessita de aprovação;
+- materiais com quantidade igual ou inferior ao estoque mínimo são identificados como estoque baixo;
+- relatórios apresentam informações consolidadas dos módulos do sistema.
+
+---
+
+## 21. Testes realizados
+
+Durante o desenvolvimento foram realizados testes manuais dos principais fluxos da aplicação.
+
+Foram testados:
+
+- autenticação;
+- cadastro de clientes;
+- atualização de clientes;
+- exclusão de clientes;
+- cadastro de projetos;
+- atualização de projetos;
+- cadastro de ambientes;
+- atualização de ambientes;
+- criação de orçamentos;
+- aprovação e reprovação de orçamentos;
+- controle de validade dos orçamentos;
+- criação de pedidos;
+- controle de pedidos duplicados;
+- alterações de status dos pedidos;
+- criação de produção;
+- controle do pagamento mínimo de 30%;
+- controle de estoque na produção;
+- cancelamento de produção;
+- devolução de materiais ao estoque;
+- entrada de materiais;
+- saída de materiais;
+- bloqueio de saída superior ao estoque;
+- bloqueio da exclusão de movimentações;
+- pagamentos parciais;
+- pagamentos totais;
+- controle de valores pagos;
+- assistência técnica;
+- controle de garantia;
+- utilização de materiais na assistência;
+- devolução de materiais após exclusão da assistência;
+- solicitação de substituição de materiais;
+- aprovação e recusa de substituições;
+- relatórios financeiros;
+- relatório de estoque;
+- relatório de produção;
+- relatório de pedidos;
+- relatório de assistência;
+- relatório geral do sistema.
+
+A aplicação foi compilada e executada localmente utilizando **Java 21**, **Spring Boot** e **MySQL 8.4 em Docker**.
+
+---
+
+## 22. Execução durante o desenvolvimento
+
+O projeto pode ser executado no ambiente de desenvolvimento utilizando WSL, Docker e Java 21.
+
+Entre na pasta do projeto:
+
+```bash
+cd /mnt/c/Users/wuesley/OneDrive/Imagens/Desktop/TCC/marcenariapro
+```
+
+Inicie o banco:
+
+```bash
+docker compose up -d
+```
+
+Execute a aplicação:
+
+```bash
+./mvnw spring-boot:run
+```
+
+A aplicação estará disponível em:
+
+```text
+http://localhost:8080
+```
+
+---
+
+## 23. Compilação
+
+Para verificar a compilação do projeto:
+
+```bash
+./mvnw clean compile
+```
+
+Para executar os testes automatizados, quando disponíveis:
+
+```bash
+./mvnw test
+```
+
+---
+
+## 24. Banco de dados
+
+O sistema utiliza o MySQL 8.4.
+
+Configurações principais utilizadas no ambiente de desenvolvimento:
+
+```text
+Banco: marcenariapro
+Host: localhost
+Porta: 3306
+```
+
+O Hibernate/JPA é responsável pelo mapeamento das entidades Java para as tabelas do banco.
+
+Durante o desenvolvimento, a aplicação utiliza:
+
+```properties
+spring.jpa.hibernate.ddl-auto=update
+```
+
+Essa configuração permite que o Hibernate atualize a estrutura das tabelas conforme as entidades da aplicação.
+
+---
+
+## 25. Segurança
+
+A aplicação utiliza:
+
+- Spring Security;
+- autenticação JWT;
+- senha armazenada utilizando mecanismo de hash;
+- controle de acesso por perfil;
+- autenticação nas rotas protegidas.
+
+O token JWT deve ser enviado através do cabeçalho:
+
+```text
+Authorization: Bearer <token>
+```
+
+---
+
+## 26. Integração com o frontend
+
+O backend disponibiliza uma API REST para integração com o frontend do MarcenariaPro.
+
+A aplicação frontend poderá consumir os endpoints utilizando:
+
+```text
+http://localhost:8080
+```
+
+Os principais módulos disponíveis para integração são:
+
+```text
+/auth
+/usuarios
+/clientes
+/projetos
+/ambientes
+/orcamentos
+/pedidos
+/producoes
+/materiais
+/movimentacoes-estoque
+/pagamentos
+/assistencias-tecnicas
+/solicitacoes-substituicao
+/relatorios
+```
+
+---
+
+## 27. Próximo passo
+
+Com o backend estruturado e os principais fluxos testados, o próximo passo do projeto é o desenvolvimento do **frontend do MarcenariaPro**.
+
+A interface deverá integrar os endpoints disponibilizados pelo backend e contemplar os principais módulos do sistema:
+
+- Login;
+- Dashboard;
+- Clientes;
+- Projetos;
+- Ambientes;
+- Orçamentos;
+- Pedidos;
+- Produção;
+- Estoque;
+- Pagamentos;
+- Assistência técnica;
+- Relatórios;
+- Usuários e configurações administrativas.

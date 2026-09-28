@@ -90,16 +90,16 @@ public class MovimentacaoEstoqueService {
         return converterParaResponse(movimentacao);
     }
 
-    public void excluir(Long id) {
+  public void excluir(Long id) {
 
-        MovimentacaoEstoque movimentacao =
-                movimentacaoRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Movimentação não encontrada"));
+    movimentacaoRepository.findById(id)
+            .orElseThrow(() ->
+                    new RuntimeException(
+                            "Movimentação não encontrada"));
 
-        movimentacaoRepository.delete(movimentacao);
-    }
+    throw new RuntimeException(
+            "Não é possível excluir uma movimentação de estoque.");
+}
 
     private MovimentacaoEstoqueResponseDTO converterParaResponse(
             MovimentacaoEstoque movimentacao) {
