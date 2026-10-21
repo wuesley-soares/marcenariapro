@@ -3,6 +3,7 @@ package br.edu.ifpr.marcenariapro.controller;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +27,7 @@ public class AmbienteController {
         this.service = service;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @PostMapping
     public ResponseEntity<AmbienteResponseDTO> salvar(
             @RequestBody AmbienteRequestDTO dto) {
@@ -33,20 +35,23 @@ public class AmbienteController {
         return ResponseEntity.ok(service.salvar(dto));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping
     public ResponseEntity<List<AmbienteResponseDTO>> listar() {
 
         return ResponseEntity.ok(service.listar());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @PutMapping("/{id}")
-public ResponseEntity<AmbienteResponseDTO> atualizar(
-        @PathVariable Long id,
-        @RequestBody AmbienteRequestDTO dto) {
+    public ResponseEntity<AmbienteResponseDTO> atualizar(
+            @PathVariable Long id,
+            @RequestBody AmbienteRequestDTO dto) {
 
-    return ResponseEntity.ok(service.atualizar(id, dto));
-}
+        return ResponseEntity.ok(service.atualizar(id, dto));
+    }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping("/{id}")
     public ResponseEntity<AmbienteResponseDTO> buscarPorId(
             @PathVariable Long id) {
@@ -54,11 +59,13 @@ public ResponseEntity<AmbienteResponseDTO> atualizar(
         return ResponseEntity.ok(service.buscarPorId(id));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @DeleteMapping("/{id}")
-public ResponseEntity<Void> excluir(@PathVariable Long id) {
+    public ResponseEntity<Void> excluir(
+            @PathVariable Long id) {
 
-    service.excluir(id);
+        service.excluir(id);
 
-    return ResponseEntity.noContent().build();
-}
+        return ResponseEntity.noContent().build();
+    }
 }

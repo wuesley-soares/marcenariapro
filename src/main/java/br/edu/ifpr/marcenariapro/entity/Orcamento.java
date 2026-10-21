@@ -26,6 +26,10 @@ public class Orcamento {
 
     private String descricao;
 
+    private BigDecimal valorMaoObra;
+
+    private BigDecimal margemLucro;
+
     @Enumerated(EnumType.STRING)
     private StatusOrcamento status;
 
@@ -92,6 +96,22 @@ public class Orcamento {
 
 public void setDataValidade(LocalDateTime dataValidade) {
     this.dataValidade = dataValidade;
+}
+
+public BigDecimal getValorMaoObra() {
+    return valorMaoObra;
+}
+
+public void setValorMaoObra(BigDecimal valorMaoObra) {
+    this.valorMaoObra = valorMaoObra;
+}
+
+public BigDecimal getMargemLucro() {
+    return margemLucro;
+}
+
+public void setMargemLucro(BigDecimal margemLucro) {
+    this.margemLucro = margemLucro;
 }
 
 

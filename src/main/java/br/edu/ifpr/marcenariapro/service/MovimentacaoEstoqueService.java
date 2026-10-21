@@ -73,10 +73,13 @@ public class MovimentacaoEstoqueService {
 
     public List<MovimentacaoEstoqueResponseDTO> listar() {
 
-        return movimentacaoRepository.findAll()
-                .stream()
-                .map(this::converterParaResponse)
-                .toList();
+          return movimentacaoRepository.findAll()
+            .stream()
+            .sorted((a, b) ->
+                    b.getDataMovimentacao()
+                            .compareTo(a.getDataMovimentacao()))
+            .map(this::converterParaResponse)
+            .toList();
     }
 
     public MovimentacaoEstoqueResponseDTO buscarPorId(Long id) {

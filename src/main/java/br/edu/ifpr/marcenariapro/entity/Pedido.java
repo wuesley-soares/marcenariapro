@@ -1,5 +1,6 @@
 package br.edu.ifpr.marcenariapro.entity;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import br.edu.ifpr.marcenariapro.enums.StatusPedido;
@@ -25,6 +26,10 @@ public class Pedido {
     private StatusPedido status;
 
     private LocalDateTime dataCriacao;
+
+  private LocalDate previsaoEntrega;
+
+private LocalDate dataEntrega;
 
     @OneToOne
     @JoinColumn(name = "orcamento_id")
@@ -52,6 +57,21 @@ public class Pedido {
 
     public void setDataCriacao(LocalDateTime dataCriacao) {
         this.dataCriacao = dataCriacao;
+    }
+
+public LocalDate getPrevisaoEntrega() {
+    return previsaoEntrega;
+}
+
+public void setPrevisaoEntrega(LocalDate previsaoEntrega) {
+    this.previsaoEntrega = previsaoEntrega;
+}
+    public LocalDate getDataEntrega() {
+        return dataEntrega;
+    }
+
+    public void setDataEntrega(LocalDate dataEntrega) {
+        this.dataEntrega = dataEntrega;
     }
 
     public Orcamento getOrcamento() {

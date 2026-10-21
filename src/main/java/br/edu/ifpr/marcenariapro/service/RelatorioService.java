@@ -61,13 +61,12 @@ public RelatorioService(
     long totalPedidos = pedidoRepository.count();
     long totalAssistencias = assistenciaRepository.count();
 
-        long pedidosEmProducao =
-        pedidoRepository.countByStatus(
-                br.edu.ifpr.marcenariapro.enums.StatusPedido.EM_PRODUCAO);
+long pedidosEmProducao =
+        producaoRepository.countByStatus(StatusProducao.EM_PRODUCAO);
 
-    long pedidosConcluidos =
-            producaoRepository.countByStatus(StatusProducao.PRONTO)
-            + producaoRepository.countByStatus(StatusProducao.ENTREGUE);
+long pedidosConcluidos =
+        producaoRepository.countByStatus(StatusProducao.PRONTO)
+        + producaoRepository.countByStatus(StatusProducao.ENTREGUE);
 
     double valorTotalVendas =
             pedidoRepository.somarValorVendas().doubleValue();

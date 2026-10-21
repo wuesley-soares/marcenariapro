@@ -8,12 +8,15 @@ import org.springframework.stereotype.Service;
 import br.edu.ifpr.marcenariapro.dto.MovimentacaoEstoqueRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.ProducaoRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.ProducaoResponseDTO;
+import br.edu.ifpr.marcenariapro.entity.ItemOrcamento;
+import br.edu.ifpr.marcenariapro.entity.ItemProducao;
 import br.edu.ifpr.marcenariapro.entity.Pagamento;
 import br.edu.ifpr.marcenariapro.entity.Pedido;
 import br.edu.ifpr.marcenariapro.entity.Producao;
 import br.edu.ifpr.marcenariapro.enums.StatusPedido;
 import br.edu.ifpr.marcenariapro.enums.StatusProducao;
 import br.edu.ifpr.marcenariapro.enums.TipoMovimentacao;
+import br.edu.ifpr.marcenariapro.repository.ItemOrcamentoRepository;
 import br.edu.ifpr.marcenariapro.repository.ItemProducaoRepository;
 import br.edu.ifpr.marcenariapro.repository.PagamentoRepository;
 import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
@@ -24,6 +27,7 @@ public class ProducaoService {
 
     private final ProducaoRepository producaoRepository;
     private final PedidoRepository pedidoRepository;
+    private final ItemOrcamentoRepository itemOrcamentoRepository;
     private final ItemProducaoRepository itemProducaoRepository;
     private final MovimentacaoEstoqueService movimentacaoEstoqueService;
     private final PagamentoRepository pagamentoRepository;
@@ -32,14 +36,16 @@ public ProducaoService(
         ProducaoRepository producaoRepository,
         PedidoRepository pedidoRepository,
         ItemProducaoRepository itemProducaoRepository,
+        ItemOrcamentoRepository itemOrcamentoRepository,
         MovimentacaoEstoqueService movimentacaoEstoqueService,
         PagamentoRepository pagamentoRepository) {
 
-    this.producaoRepository = producaoRepository;
-    this.pedidoRepository = pedidoRepository;
-    this.itemProducaoRepository = itemProducaoRepository;
-    this.movimentacaoEstoqueService = movimentacaoEstoqueService;
-    this.pagamentoRepository = pagamentoRepository;
+this.producaoRepository = producaoRepository;
+this.pedidoRepository = pedidoRepository;
+this.itemProducaoRepository = itemProducaoRepository;
+this.itemOrcamentoRepository = itemOrcamentoRepository;
+this.movimentacaoEstoqueService = movimentacaoEstoqueService;
+this.pagamentoRepository = pagamentoRepository;
 }
 
 public ProducaoResponseDTO salvar(ProducaoRequestDTO dto) {
@@ -47,20 +53,19 @@ public ProducaoResponseDTO salvar(ProducaoRequestDTO dto) {
     Pedido pedido = pedidoRepository.findById(dto.pedidoId())
             .orElseThrow(() -> new RuntimeException("Pedido não encontrado"));
 
-            if (pedido.getStatus() == StatusPedido.ENTREGUE
-        || pedido.getStatus() == StatusPedido.CANCELADO) {
-
-    throw new RuntimeException(
-            "Não é possível criar uma produção para um pedido entregue ou cancelado."
-    );
-}
-
-            if (producaoRepository.existsByPedidoId(dto.pedidoId())) {
+  if (pedido.getStatus() != StatusPedido.APROVADO) {
     throw new RuntimeException(
             "Não é possível criar a produção. "
-            + "Este pedido já possui uma produção."
+            + "O pedido precisa estar aprovado."
     );
 }
+
+    if (producaoRepository.existsByPedidoId(dto.pedidoId())) {
+        throw new RuntimeException(
+                "Não é possível criar a produção. "
+                + "Este pedido já possui uma produção."
+        );
+    }
 
     if (dto.status() != StatusProducao.AGUARDANDO) {
         throw new RuntimeException(
@@ -74,6 +79,21 @@ public ProducaoResponseDTO salvar(ProducaoRequestDTO dto) {
     producao.setPedido(pedido);
 
     Producao producaoSalva = producaoRepository.save(producao);
+
+    // Copia os materiais do orçamento para a produção
+    var itensOrcamento = itemOrcamentoRepository
+            .findByOrcamentoId(pedido.getOrcamento().getId());
+
+    for (ItemOrcamento itemOrcamento : itensOrcamento) {
+
+        ItemProducao itemProducao = new ItemProducao();
+
+        itemProducao.setQuantidade(itemOrcamento.getQuantidade());
+        itemProducao.setMaterial(itemOrcamento.getMaterial());
+        itemProducao.setProducao(producaoSalva);
+
+        itemProducaoRepository.save(itemProducao);
+    }
 
     return converterParaResponse(producaoSalva);
 }
@@ -121,7 +141,7 @@ public ProducaoResponseDTO salvar(ProducaoRequestDTO dto) {
         MovimentacaoEstoqueRequestDTO movimentacao =
                 new MovimentacaoEstoqueRequestDTO(
                         TipoMovimentacao.ENTRADA,
-                        item.getQuantidade(),
+                       item.getQuantidade().intValue(),
                         material.getId()
                 );
 
@@ -184,30 +204,39 @@ public ProducaoResponseDTO salvar(ProducaoRequestDTO dto) {
                  + "O pedido precisa ter pelo menos 30% do valor pago.");
                          }
 
-            var itens = itemProducaoRepository.findAll()
-                    .stream()
-                    .filter(item -> item.getProducao().getId().equals(id))
-                    .toList();
+           var itens = itemProducaoRepository.findAll()
+        .stream()
+        .filter(item -> item.getProducao().getId().equals(id))
+        .toList();
 
-            for (var item : itens) {
+// Primeiro verifica se existe estoque suficiente para TODOS os materiais
+                for (var item : itens) {
 
                 var material = item.getMaterial();
 
-                if (material.getQuantidade() < item.getQuantidade()) {
-                    throw new RuntimeException(
-                            "Quantidade insuficiente em estoque para o material: "
-                                    + material.getNome());
+                if (BigDecimal.valueOf(material.getQuantidade())
+                        .compareTo(item.getQuantidade()) < 0) {
+
+                        throw new RuntimeException(
+                                "Quantidade insuficiente em estoque para o material: "
+                                        + material.getNome());
                 }
+                }
+
+                // Só depois de todas as validações, realiza as saídas
+                for (var item : itens) {
+
+                var material = item.getMaterial();
 
                 MovimentacaoEstoqueRequestDTO movimentacao =
                         new MovimentacaoEstoqueRequestDTO(
                                 TipoMovimentacao.SAIDA,
-                                item.getQuantidade(),
+                                item.getQuantidade().intValue(),
                                 material.getId()
                         );
 
                 movimentacaoEstoqueService.salvar(movimentacao);
-            }
+                }
         }
 
 if (dto.status() == StatusProducao.ENTREGUE) {

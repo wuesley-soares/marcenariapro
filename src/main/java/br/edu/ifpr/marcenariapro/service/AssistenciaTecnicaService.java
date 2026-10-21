@@ -58,9 +58,13 @@ public AssistenciaTecnicaService(
                 .orElseThrow(() ->
                         new RuntimeException("Cliente não encontrado"));
 
-        Pedido pedido = pedidoRepository.findById(dto.pedidoId())
-                .orElseThrow(() ->
-                        new RuntimeException("Pedido não encontrado"));
+                 Pedido pedido = null;
+
+                if (dto.pedidoId() != null) {
+                pedido = pedidoRepository.findById(dto.pedidoId())
+                        .orElseThrow(() ->
+                                new RuntimeException("Pedido não encontrado"));
+                }
 
         Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
                 .orElseThrow(() ->
@@ -123,9 +127,13 @@ public AssistenciaTecnicaService(
             .orElseThrow(() ->
                     new RuntimeException("Cliente não encontrado"));
 
-    Pedido pedido = pedidoRepository.findById(dto.pedidoId())
-            .orElseThrow(() ->
-                    new RuntimeException("Pedido não encontrado"));
+                Pedido pedido = null;
+
+                if (dto.pedidoId() != null) {
+                pedido = pedidoRepository.findById(dto.pedidoId())
+                        .orElseThrow(() ->
+                                new RuntimeException("Pedido não encontrado"));
+                }
 
     Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
             .orElseThrow(() ->
@@ -256,6 +264,54 @@ assistenciaRepository.save(assistencia);
     verificarGarantia(assistencia);
 }
 
+@Transactional
+public void excluirMaterial(
+        Long assistenciaId,
+        Long itemId) {
+
+    AssistenciaTecnica assistencia =
+            assistenciaRepository.findById(assistenciaId)
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Assistência técnica não encontrada"
+                            )
+                    );
+
+    ItemAssistenciaTecnica item =
+            itemAssistenciaRepository.findById(itemId)
+                    .orElseThrow(() ->
+                            new RuntimeException(
+                                    "Material da assistência não encontrado"
+                            )
+                    );
+
+    if (!item.getAssistencia().getId()
+            .equals(assistenciaId)) {
+
+        throw new RuntimeException(
+                "O material não pertence a esta assistência"
+        );
+    }
+
+    Material material = item.getMaterial();
+
+    // Devolve o material ao estoque
+    material.setQuantidade(
+            material.getQuantidade()
+                    + item.getQuantidade()
+    );
+
+    materialRepository.save(material);
+
+    // Remove o item da assistência
+    itemAssistenciaRepository.delete(item);
+
+    // Recalcula os valores da assistência
+    calcularValorMateriais(assistencia);
+
+    assistenciaRepository.save(assistencia);
+}
+
 public List<ItemAssistenciaTecnicaResponseDTO> listarMateriais(
         Long assistenciaId) {
 
@@ -325,7 +381,9 @@ public List<ItemAssistenciaTecnicaResponseDTO> listarMateriais(
                 assistencia.getValorTotal(),
                 assistencia.getStatus(),
                 assistencia.getCliente().getId(),
-                assistencia.getPedido().getId(),
+                assistencia.getPedido() != null
+                ? assistencia.getPedido().getId()
+                : null,
                 assistencia.getFuncionario().getId()
         );
     }

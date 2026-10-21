@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ public class OrcamentoController {
         this.service = service;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @PostMapping
     public ResponseEntity<OrcamentoResponseDTO> salvar(
             @RequestBody OrcamentoRequestDTO dto) {
@@ -38,32 +40,36 @@ public class OrcamentoController {
                 .body(orcamento);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping
     public ResponseEntity<List<OrcamentoResponseDTO>> listar() {
 
         return ResponseEntity.ok(service.listar());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping("/{id}")
-public ResponseEntity<OrcamentoResponseDTO> buscarPorId(
-        @PathVariable Long id) {
+    public ResponseEntity<OrcamentoResponseDTO> buscarPorId(
+            @PathVariable Long id) {
 
-    return ResponseEntity.ok(service.buscarPorId(id));
-}
+        return ResponseEntity.ok(service.buscarPorId(id));
+    }
 
-@PutMapping("/{id}")
-public ResponseEntity<OrcamentoResponseDTO> atualizar(
-        @PathVariable Long id,
-        @RequestBody OrcamentoRequestDTO dto) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+    @PutMapping("/{id}")
+    public ResponseEntity<OrcamentoResponseDTO> atualizar(
+            @PathVariable Long id,
+            @RequestBody OrcamentoRequestDTO dto) {
 
-    return ResponseEntity.ok(service.atualizar(id, dto));
-}
+        return ResponseEntity.ok(service.atualizar(id, dto));
+    }
 
-@DeleteMapping("/{id}")
-public ResponseEntity<Void> excluir(@PathVariable Long id) {
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> excluir(@PathVariable Long id) {
 
-    service.excluir(id);
+        service.excluir(id);
 
-    return ResponseEntity.noContent().build();
-}
+        return ResponseEntity.noContent().build();
+    }
 }

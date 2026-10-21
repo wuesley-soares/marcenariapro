@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ public class ProjetoController {
         this.service = service;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @PostMapping
     public ResponseEntity<ProjetoResponseDTO> salvar(
             @RequestBody ProjetoRequestDTO dto) {
@@ -34,36 +36,45 @@ public class ProjetoController {
         return ResponseEntity.ok(service.salvar(dto));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping
     public ResponseEntity<List<ProjetoResponseDTO>> listar() {
 
         return ResponseEntity.ok(service.listar());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping("/{id}")
     public ResponseEntity<ProjetoResponseDTO> buscarPorId(
             @PathVariable Long id) {
 
         return ResponseEntity.ok(service.buscarPorId(id));
     }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @DeleteMapping("/{id}")
-public ResponseEntity<Void> excluir(@PathVariable Long id) {
+    public ResponseEntity<Void> excluir(
+            @PathVariable Long id) {
 
-    service.excluir(id);
+        service.excluir(id);
 
-    return ResponseEntity.noContent().build();
-}
+        return ResponseEntity.noContent().build();
+    }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @PutMapping("/{id}")
-public ResponseEntity<ProjetoResponseDTO> atualizar(
-        @PathVariable Long id,
-        @RequestBody ProjetoRequestDTO dto) {
+    public ResponseEntity<ProjetoResponseDTO> atualizar(
+            @PathVariable Long id,
+            @RequestBody ProjetoRequestDTO dto) {
 
-    return ResponseEntity.ok(service.atualizar(id, dto));
-}
+        return ResponseEntity.ok(service.atualizar(id, dto));
+    }
 
-@GetMapping("/{id}/total")
-public BigDecimal calcularTotalProjeto(@PathVariable Long id) {
-    return service.calcularTotalProjeto(id);
-}
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
+    @GetMapping("/{id}/total")
+    public BigDecimal calcularTotalProjeto(
+            @PathVariable Long id) {
+
+        return service.calcularTotalProjeto(id);
+    }
 }

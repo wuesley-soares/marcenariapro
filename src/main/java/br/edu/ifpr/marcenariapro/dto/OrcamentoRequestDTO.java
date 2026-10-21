@@ -5,11 +5,9 @@ import java.math.BigDecimal;
 import br.edu.ifpr.marcenariapro.enums.StatusOrcamento;
 
 public record OrcamentoRequestDTO(
-
-    BigDecimal valor,
+    BigDecimal valorMaoObra,
+    BigDecimal margemLucro,
     String descricao,
     StatusOrcamento status,
     Long ambienteId
-
-) {
-}
+) {}

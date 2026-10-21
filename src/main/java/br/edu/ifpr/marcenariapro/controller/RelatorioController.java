@@ -2,6 +2,7 @@ package br.edu.ifpr.marcenariapro.controller;
 
 import java.util.List;
 
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -24,33 +25,39 @@ public class RelatorioController {
         this.relatorioService = relatorioService;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @GetMapping("/resumo")
     public RelatorioResumoResponseDTO resumo() {
         return relatorioService.gerarResumo();
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @GetMapping("/estoque")
     public List<RelatorioEstoqueResponseDTO> estoqueBaixo() {
         return relatorioService.estoqueBaixo();
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @GetMapping("/financeiro")
     public List<RelatorioFinanceiroResponseDTO> financeiro() {
         return relatorioService.financeiro();
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @GetMapping("/producao")
     public List<RelatorioProducaoResponseDTO> producao() {
-    return relatorioService.producao();
-    }   
+        return relatorioService.producao();
+    }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @GetMapping("/pedidos-status")
     public List<RelatorioPedidosResponseDTO> pedidosPorStatus() {
-    return relatorioService.pedidosPorStatus();
-}
+        return relatorioService.pedidosPorStatus();
+    }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @GetMapping("/assistencias-status")
     public List<RelatorioAssistenciaResponseDTO> assistenciasPorStatus() {
-    return relatorioService.assistenciasPorStatus();
-}
+        return relatorioService.assistenciasPorStatus();
+    }
 }

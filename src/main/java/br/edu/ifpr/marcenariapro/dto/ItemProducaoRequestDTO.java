@@ -1,7 +1,9 @@
 package br.edu.ifpr.marcenariapro.dto;
 
+import java.math.BigDecimal;
+
 public record ItemProducaoRequestDTO(
-        Integer quantidade,
+        BigDecimal quantidade,
         Long materialId
 ) {
 }

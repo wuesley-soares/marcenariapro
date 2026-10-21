@@ -1,7 +1,10 @@
+
 package br.edu.ifpr.marcenariapro.service;
 
+import java.text.Normalizer;
 import java.util.List;
 import java.util.Optional;
+
 import org.springframework.stereotype.Service;
 
 import br.edu.ifpr.marcenariapro.dto.ClienteRequestDTO;
@@ -14,92 +17,249 @@ import br.edu.ifpr.marcenariapro.repository.AssistenciaTecnicaRepository;
 @Service
 public class ClienteService {
 
-private final ClienteRepository repository;
-private final ProjetoRepository projetoRepository;
-private final AssistenciaTecnicaRepository assistenciaTecnicaRepository;
+    private final ClienteRepository repository;
+    private final ProjetoRepository projetoRepository;
+    private final AssistenciaTecnicaRepository assistenciaTecnicaRepository;
 
     public ClienteService(
-        ClienteRepository repository,
-        ProjetoRepository projetoRepository,
-        AssistenciaTecnicaRepository assistenciaTecnicaRepository) {
+            ClienteRepository repository,
+            ProjetoRepository projetoRepository,
+            AssistenciaTecnicaRepository assistenciaTecnicaRepository) {
 
-    this.repository = repository;
-    this.projetoRepository = projetoRepository;
-    this.assistenciaTecnicaRepository = assistenciaTecnicaRepository;
-}
+        this.repository = repository;
+        this.projetoRepository = projetoRepository;
+        this.assistenciaTecnicaRepository = assistenciaTecnicaRepository;
+    }
 
     public ClienteResponseDTO salvar(ClienteRequestDTO dto) {
 
-        String cpfCnpj = dto.cpfCnpj() != null
-        ? dto.cpfCnpj().trim()
-        : null;
+        validarDados(dto);
 
-        if (dto.nome() == null || dto.nome().isBlank()) {
-    throw new RuntimeException(
-            "O nome do cliente é obrigatório."
-    );
-}
+        String email = dto.email().trim().toLowerCase();
+        String cpfCnpj = limparDocumento(dto.cpfCnpj());
 
-if (dto.email() == null || dto.email().isBlank()) {
-    throw new RuntimeException(
-            "O e-mail do cliente é obrigatório."
-    );
-}
+        if (repository.findByEmail(email).isPresent()) {
+            throw new RuntimeException(
+                    "Já existe um cliente cadastrado com este e-mail.");
+        }
 
-if (!dto.email().contains("@")) {
-    throw new RuntimeException(
-            "O e-mail informado é inválido."
-    );
-}
-
-if (dto.telefone() == null || dto.telefone().isBlank()) {
-    throw new RuntimeException(
-            "O telefone do cliente é obrigatório."
-    );
-}
-
-if (repository.findByEmail(dto.email()).isPresent()) {
-    throw new RuntimeException(
-            "Já existe um cliente cadastrado com este e-mail."
-    );
-}
-
-
-        if (dto.cpfCnpj() == null || dto.cpfCnpj().isBlank()) {
-    throw new RuntimeException(
-            "O CPF/CNPJ é obrigatório."
-    );
-}
-
-        if (repository.findByCpfCnpj(dto.cpfCnpj()).isPresent()) {
-    throw new RuntimeException(
-            "Já existe um cliente cadastrado com este CPF/CNPJ."
-    );
-}
+        if (repository.findByCpfCnpj(cpfCnpj).isPresent()) {
+            throw new RuntimeException(
+                    "Já existe um cliente cadastrado com este CPF/CNPJ.");
+        }
 
         Cliente cliente = new Cliente();
 
-        cliente.setNome(dto.nome());
-        cliente.setEmail(dto.email());
-        cliente.setTelefone(dto.telefone());
-        cliente.setCpfCnpj(cpfCnpj);
-        cliente.setEndereco(dto.endereco());
+        preencherCliente(cliente, dto, email, cpfCnpj);
 
-        Cliente clienteSalvo = repository.save(cliente);
-
-        return converterParaResponse(clienteSalvo);
+        return converterParaResponse(repository.save(cliente));
     }
 
     public List<ClienteResponseDTO> listar() {
-
         return repository.findAll()
                 .stream()
                 .map(this::converterParaResponse)
                 .toList();
     }
 
-    private ClienteResponseDTO converterParaResponse(Cliente cliente) {
+    public ClienteResponseDTO buscarPorId(Long id) {
+        Cliente cliente = repository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Cliente não encontrado."));
 
+        return converterParaResponse(cliente);
+    }
+
+    public ClienteResponseDTO atualizar(Long id, ClienteRequestDTO dto) {
+
+        Cliente cliente = repository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Cliente não encontrado."));
+
+        validarDados(dto);
+
+        String email = dto.email().trim().toLowerCase();
+        String cpfCnpj = limparDocumento(dto.cpfCnpj());
+
+        Optional<Cliente> clienteEmail =
+                repository.findByEmail(email);
+
+        if (clienteEmail.isPresent()
+                && !clienteEmail.get().getId().equals(id)) {
+            throw new RuntimeException(
+                    "Já existe outro cliente cadastrado com este e-mail.");
+        }
+
+        Optional<Cliente> clienteCpfCnpj =
+                repository.findByCpfCnpj(cpfCnpj);
+
+        if (clienteCpfCnpj.isPresent()
+                && !clienteCpfCnpj.get().getId().equals(id)) {
+            throw new RuntimeException(
+                    "Já existe outro cliente cadastrado com este CPF/CNPJ.");
+        }
+
+        preencherCliente(cliente, dto, email, cpfCnpj);
+
+        return converterParaResponse(repository.save(cliente));
+    }
+
+    private void validarDados(ClienteRequestDTO dto) {
+
+        if (dto.nome() == null || dto.nome().isBlank()) {
+            throw new RuntimeException(
+                    "O nome do cliente é obrigatório.");
+        }
+
+        String nome = dto.nome().trim();
+
+        if (nome.length() < 2 || nome.length() > 100
+                || !nome.matches(
+                    "[\\p{L}][\\p{L} '\\u002D]*[\\p{L}]|[\\p{L}]")) {
+            throw new RuntimeException(
+                    "Informe um nome válido, usando letras e espaços.");
+        }
+
+        if (dto.email() == null || dto.email().isBlank()) {
+            throw new RuntimeException(
+                    "O e-mail do cliente é obrigatório.");
+        }
+
+        String email = dto.email().trim();
+
+        if (email.length() > 254
+                || !email.matches(
+                    "^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+"
+                    + "@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}"
+                    + "[A-Za-z0-9])?"
+                    + "(?:\\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}"
+                    + "[A-Za-z0-9])?)+$")) {
+            throw new RuntimeException(
+                    "O e-mail informado é inválido.");
+        }
+
+        if (dto.telefone() == null || dto.telefone().isBlank()) {
+            throw new RuntimeException(
+                    "O telefone do cliente é obrigatório.");
+        }
+
+        String telefone = dto.telefone().replaceAll("\\D", "");
+
+        if (telefone.length() < 10 || telefone.length() > 11
+                || telefone.matches("(\\d)\\1+")
+                || !telefone.matches("[1-9][0-9]{9,10}")) {
+            throw new RuntimeException(
+                    "Informe um telefone válido com DDD.");
+        }
+
+        if (dto.cpfCnpj() == null || dto.cpfCnpj().isBlank()) {
+            throw new RuntimeException(
+                    "O CPF/CNPJ é obrigatório.");
+        }
+
+        String documento = limparDocumento(dto.cpfCnpj());
+
+        if (!validarCpfCnpj(documento)) {
+            throw new RuntimeException(
+                    "O CPF/CNPJ informado é inválido.");
+        }
+    }
+
+    private String limparDocumento(String documento) {
+        return documento.replaceAll("\\D", "");
+    }
+
+    private boolean validarCpfCnpj(String documento) {
+        if (documento.length() == 11) {
+            return validarCpf(documento);
+        }
+
+        if (documento.length() == 14) {
+            return validarCnpj(documento);
+        }
+
+        return false;
+    }
+
+    private boolean validarCpf(String cpf) {
+
+        if (cpf.matches("(\\d)\\1{10}")) {
+            return false;
+        }
+
+        int soma = 0;
+
+        for (int i = 0; i < 9; i++) {
+            soma += Character.getNumericValue(cpf.charAt(i)) * (10 - i);
+        }
+
+        int resto = (soma * 10) % 11;
+        int digito1 = resto == 10 ? 0 : resto;
+
+        if (digito1 != Character.getNumericValue(cpf.charAt(9))) {
+            return false;
+        }
+
+        soma = 0;
+
+        for (int i = 0; i < 10; i++) {
+            soma += Character.getNumericValue(cpf.charAt(i)) * (11 - i);
+        }
+
+        resto = (soma * 10) % 11;
+        int digito2 = resto == 10 ? 0 : resto;
+
+        return digito2 == Character.getNumericValue(cpf.charAt(10));
+    }
+
+    private boolean validarCnpj(String cnpj) {
+
+        if (cnpj.matches("(\\d)\\1{13}")) {
+            return false;
+        }
+
+        int[] pesos1 = {5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+        int[] pesos2 = {6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2};
+
+        int soma = 0;
+
+        for (int i = 0; i < 12; i++) {
+            soma += Character.getNumericValue(cnpj.charAt(i)) * pesos1[i];
+        }
+
+        int resto = soma % 11;
+        int digito1 = resto < 2 ? 0 : 11 - resto;
+
+        if (digito1 != Character.getNumericValue(cnpj.charAt(12))) {
+            return false;
+        }
+
+        soma = 0;
+
+        for (int i = 0; i < 13; i++) {
+            soma += Character.getNumericValue(cnpj.charAt(i)) * pesos2[i];
+        }
+
+        resto = soma % 11;
+        int digito2 = resto < 2 ? 0 : 11 - resto;
+
+        return digito2 == Character.getNumericValue(cnpj.charAt(13));
+    }
+
+    private void preencherCliente(
+            Cliente cliente,
+            ClienteRequestDTO dto,
+            String email,
+            String cpfCnpj) {
+
+        cliente.setNome(dto.nome().trim());
+        cliente.setEmail(email);
+        cliente.setTelefone(dto.telefone().trim());
+        cliente.setCpfCnpj(cpfCnpj);
+        cliente.setEndereco(dto.endereco());
+    }
+
+    private ClienteResponseDTO converterParaResponse(Cliente cliente) {
         return new ClienteResponseDTO(
                 cliente.getId(),
                 cliente.getNome(),
@@ -111,104 +271,22 @@ if (repository.findByEmail(dto.email()).isPresent()) {
         );
     }
 
-    public ClienteResponseDTO buscarPorId(Long id) {
+    public void excluir(Long id) {
 
-    Cliente cliente = repository.findById(id)
-            .orElseThrow(() ->
-                    new RuntimeException("Cliente não encontrado"));
+        Cliente cliente = repository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException("Cliente não encontrado."));
 
-    return converterParaResponse(cliente);
-}
+        long projetos = projetoRepository.countByClienteId(id);
+        long assistencias =
+                assistenciaTecnicaRepository.countByClienteId(id);
 
-public ClienteResponseDTO atualizar(Long id, ClienteRequestDTO dto) {
+        if (projetos > 0 || assistencias > 0) {
+            throw new RuntimeException(
+                    "Não é possível excluir o cliente. "
+                    + "Existem registros vinculados a este cliente.");
+        }
 
-    Cliente cliente = repository.findById(id)
-            .orElseThrow(() ->
-                    new RuntimeException("Cliente não encontrado"));
-
-    String cpfCnpj = dto.cpfCnpj() != null
-            ? dto.cpfCnpj().trim()
-            : null;
-
-    if (dto.nome() == null || dto.nome().isBlank()) {
-        throw new RuntimeException(
-                "O nome do cliente é obrigatório."
-        );
+        repository.delete(cliente);
     }
-
-    if (dto.email() == null || dto.email().isBlank()) {
-        throw new RuntimeException(
-                "O e-mail do cliente é obrigatório."
-        );
-    }
-
-    if (!dto.email().contains("@")) {
-        throw new RuntimeException(
-                "O e-mail informado é inválido."
-        );
-    }
-
-    if (dto.telefone() == null || dto.telefone().isBlank()) {
-        throw new RuntimeException(
-                "O telefone do cliente é obrigatório."
-        );
-    }
-
-    if (cpfCnpj == null || cpfCnpj.isBlank()) {
-        throw new RuntimeException(
-                "O CPF/CNPJ é obrigatório."
-        );
-    }
-
-    Optional<Cliente> clienteEmail =
-            repository.findByEmail(dto.email());
-
-    if (clienteEmail.isPresent()
-            && !clienteEmail.get().getId().equals(id)) {
-
-        throw new RuntimeException(
-                "Já existe outro cliente cadastrado com este e-mail."
-        );
-    }
-
-    Optional<Cliente> clienteCpfCnpj =
-            repository.findByCpfCnpj(cpfCnpj);
-
-    if (clienteCpfCnpj.isPresent()
-            && !clienteCpfCnpj.get().getId().equals(id)) {
-
-        throw new RuntimeException(
-                "Já existe outro cliente cadastrado com este CPF/CNPJ."
-        );
-    }
-
-    cliente.setNome(dto.nome());
-    cliente.setEmail(dto.email());
-    cliente.setTelefone(dto.telefone());
-    cliente.setCpfCnpj(cpfCnpj);
-    cliente.setEndereco(dto.endereco());
-
-    Cliente atualizado = repository.save(cliente);
-
-    return converterParaResponse(atualizado);
-}
-
-public void excluir(Long id) {
-
-    Cliente cliente = repository.findById(id)
-            .orElseThrow(() ->
-                    new RuntimeException("Cliente não encontrado"));
-
-    long projetos = projetoRepository.countByClienteId(id);
-    long assistencias = assistenciaTecnicaRepository.countByClienteId(id);
-
-    if (projetos > 0 || assistencias > 0) {
-        throw new RuntimeException(
-                "Não é possível excluir o cliente. "
-                + "Existem registros vinculados a este cliente."
-        );
-    }
-
-    repository.delete(cliente);
-}
 }

@@ -10,7 +10,6 @@ import br.edu.ifpr.marcenariapro.dto.PagamentoRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.PagamentoResponseDTO;
 import br.edu.ifpr.marcenariapro.entity.Pagamento;
 import br.edu.ifpr.marcenariapro.entity.Pedido;
-import br.edu.ifpr.marcenariapro.enums.StatusPedido;
 import br.edu.ifpr.marcenariapro.repository.PagamentoRepository;
 import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
 
@@ -28,7 +27,7 @@ public class PagamentoService {
         this.pedidoRepository = pedidoRepository;
     }
 
-  public PagamentoResponseDTO salvar(PagamentoRequestDTO dto) {
+ public PagamentoResponseDTO salvar(PagamentoRequestDTO dto) {
 
     Pedido pedido = pedidoRepository.findById(dto.pedidoId())
             .orElseThrow(() ->
@@ -40,10 +39,9 @@ public class PagamentoService {
     }
 
     if (dto.status() != br.edu.ifpr.marcenariapro.enums.StatusPagamento.PAGO) {
-    throw new RuntimeException(
-            "Um novo pagamento deve ser registrado como PAGO."
-    );
-}
+        throw new RuntimeException(
+                "Um novo pagamento deve ser registrado como PAGO.");
+    }
 
     BigDecimal valorPedido = pedido.getOrcamento().getValor();
 
@@ -56,14 +54,7 @@ public class PagamentoService {
             .map(Pagamento::getValor)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-    BigDecimal valorEntrada =
-            valorPedido.multiply(new BigDecimal("0.30"));
-
-    BigDecimal valorRestante =
-            valorPedido.subtract(valorPago);
-
-    BigDecimal novoTotalPago =
-            valorPago.add(dto.valor());
+    BigDecimal novoTotalPago = valorPago.add(dto.valor());
 
     // Não permite pagar mais que o valor do pedido
     if (novoTotalPago.compareTo(valorPedido) > 0) {
@@ -71,27 +62,35 @@ public class PagamentoService {
                 "O pagamento ultrapassa o valor total do pedido");
     }
 
-    // Antes da entrega, só permite completar os 30%
-    if (pedido.getStatus() != StatusPedido.ENTREGUE) {
-
-        if (novoTotalPago.compareTo(valorEntrada) > 0) {
-            throw new RuntimeException(
-                    "Antes da entrega, o pedido pode ter no máximo "
-                    + "30% do valor pago");
-        }
-    }
-
     Pagamento pagamento = new Pagamento();
 
     pagamento.setValor(dto.valor());
+
     if (dto.dataPagamento() != null) {
-    pagamento.setDataPagamento(dto.dataPagamento());
-}
+        pagamento.setDataPagamento(dto.dataPagamento());
+    }
+
     pagamento.setDescricao(dto.descricao());
     pagamento.setStatus(dto.status());
     pagamento.setPedido(pedido);
 
     Pagamento salvo = pagamentoRepository.save(pagamento);
+
+    /*
+     * Se o total pago atingir pelo menos 30%,
+     * o pedido passa de PENDENTE para APROVADO.
+     */
+    BigDecimal valorEntrada =
+            valorPedido.multiply(new BigDecimal("0.30"));
+
+    if (pedido.getStatus() == br.edu.ifpr.marcenariapro.enums.StatusPedido.PENDENTE
+            && novoTotalPago.compareTo(valorEntrada) >= 0) {
+
+        pedido.setStatus(
+                br.edu.ifpr.marcenariapro.enums.StatusPedido.APROVADO);
+
+        pedidoRepository.save(pedido);
+    }
 
     return converterParaResponse(salvo);
 }

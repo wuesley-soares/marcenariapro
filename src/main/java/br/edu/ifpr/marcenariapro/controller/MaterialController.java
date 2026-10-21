@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ public class MaterialController {
         this.service = service;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @PostMapping
     public ResponseEntity<MaterialResponseDTO> salvar(
             @RequestBody MaterialRequestDTO dto) {
@@ -38,12 +40,14 @@ public class MaterialController {
                 .body(material);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping
     public ResponseEntity<List<MaterialResponseDTO>> listar() {
 
         return ResponseEntity.ok(service.listar());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping("/{id}")
     public ResponseEntity<MaterialResponseDTO> buscarPorId(
             @PathVariable Long id) {
@@ -51,12 +55,14 @@ public class MaterialController {
         return ResponseEntity.ok(service.buscarPorId(id));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping("/estoque-baixo")
     public ResponseEntity<List<MaterialResponseDTO>> listarEstoqueBaixo() {
 
-    return ResponseEntity.ok(service.listarEstoqueBaixo());
+        return ResponseEntity.ok(service.listarEstoqueBaixo());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @PutMapping("/{id}")
     public ResponseEntity<MaterialResponseDTO> atualizar(
             @PathVariable Long id,
@@ -65,6 +71,7 @@ public class MaterialController {
         return ResponseEntity.ok(service.atualizar(id, dto));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
 

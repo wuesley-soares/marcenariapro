@@ -4,6 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,6 +28,7 @@ public class ProducaoController {
         this.service = service;
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'MARCENEIRO')")
     @PostMapping
     public ResponseEntity<ProducaoResponseDTO> salvar(
             @RequestBody ProducaoRequestDTO dto) {
@@ -38,12 +40,14 @@ public class ProducaoController {
                 .body(producao);
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping
     public ResponseEntity<List<ProducaoResponseDTO>> listar() {
 
         return ResponseEntity.ok(service.listar());
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
     @GetMapping("/{id}")
     public ResponseEntity<ProducaoResponseDTO> buscarPorId(
             @PathVariable Long id) {
@@ -51,6 +55,7 @@ public class ProducaoController {
         return ResponseEntity.ok(service.buscarPorId(id));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'MARCENEIRO')")
     @PutMapping("/{id}")
     public ResponseEntity<ProducaoResponseDTO> atualizar(
             @PathVariable Long id,
@@ -59,6 +64,7 @@ public class ProducaoController {
         return ResponseEntity.ok(service.atualizar(id, dto));
     }
 
+    @PreAuthorize("hasAnyRole('ADMIN', 'MARCENEIRO')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> excluir(@PathVariable Long id) {
 

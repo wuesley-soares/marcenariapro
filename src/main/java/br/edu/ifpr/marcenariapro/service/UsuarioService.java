@@ -9,6 +9,10 @@ import br.edu.ifpr.marcenariapro.dto.UsuarioRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.UsuarioResponseDTO;
 import br.edu.ifpr.marcenariapro.entity.Usuario;
 import br.edu.ifpr.marcenariapro.repository.UsuarioRepository;
+import br.edu.ifpr.marcenariapro.dto.UsuarioAtualizacaoDTO;
+import br.edu.ifpr.marcenariapro.enums.PerfilUsuario;
+import br.edu.ifpr.marcenariapro.dto.UsuarioSenhaDTO;
+import jakarta.persistence.EntityNotFoundException;
 
 @Service
 public class UsuarioService {
@@ -58,4 +62,44 @@ public class UsuarioService {
                 ))
                 .toList();
     }
+
+    public UsuarioResponseDTO atualizar(
+        Long id,
+        UsuarioAtualizacaoDTO dto) {
+
+    Usuario usuario = repository.findById(id)
+            .orElseThrow(() ->
+                    new RuntimeException("Funcionário não encontrado."));
+
+    repository.findByEmail(dto.email())
+            .filter(outro -> !outro.getId().equals(id))
+            .ifPresent(outro -> {
+                throw new RuntimeException(
+                        "Este e-mail já está cadastrado.");
+            });
+
+    usuario.setNome(dto.nome());
+    usuario.setEmail(dto.email());
+    usuario.setPerfil(dto.perfil());
+    usuario.setAtivo(dto.ativo());
+
+    Usuario atualizado = repository.save(usuario);
+
+    return new UsuarioResponseDTO(
+            atualizado.getId(),
+            atualizado.getNome(),
+            atualizado.getEmail(),
+            atualizado.getPerfil(),
+            atualizado.getAtivo()
+    );
+}
+
+public void alterarSenha(Long id, UsuarioSenhaDTO dto) {
+    Usuario usuario = repository.findById(id)
+        .orElseThrow(() ->
+            new EntityNotFoundException("Funcionário não encontrado."));
+
+    usuario.setSenha(passwordEncoder.encode(dto.senha()));
+    repository.save(usuario);
+}
 }

@@ -1,5 +1,7 @@
 package br.edu.ifpr.marcenariapro.entity;
 
+import java.math.BigDecimal;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,7 +18,7 @@ public class ItemProducao {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Integer quantidade;
+    private BigDecimal quantidade;
 
     @ManyToOne
     @JoinColumn(name = "producao_id")
@@ -30,13 +32,13 @@ public class ItemProducao {
         return id;
     }
 
-    public Integer getQuantidade() {
-        return quantidade;
-    }
+  public BigDecimal getQuantidade() {
+    return quantidade;
+}
 
-    public void setQuantidade(Integer quantidade) {
-        this.quantidade = quantidade;
-    }
+public void setQuantidade(BigDecimal quantidade) {
+    this.quantidade = quantidade;
+}
 
     public Producao getProducao() {
         return producao;

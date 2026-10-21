@@ -1,5 +1,6 @@
 package br.edu.ifpr.marcenariapro.service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -11,8 +12,10 @@ import br.edu.ifpr.marcenariapro.entity.Ambiente;
 import br.edu.ifpr.marcenariapro.entity.Orcamento;
 import br.edu.ifpr.marcenariapro.enums.StatusOrcamento;
 import br.edu.ifpr.marcenariapro.repository.AmbienteRepository;
+import br.edu.ifpr.marcenariapro.repository.ItemOrcamentoRepository;
 import br.edu.ifpr.marcenariapro.repository.OrcamentoRepository;
 import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
+
 
 @Service
 public class OrcamentoService {
@@ -20,15 +23,18 @@ public class OrcamentoService {
     private final OrcamentoRepository orcamentoRepository;
     private final AmbienteRepository ambienteRepository;
     private final PedidoRepository pedidoRepository;
+    private final ItemOrcamentoRepository itemOrcamentoRepository;
 
 public OrcamentoService(
         OrcamentoRepository orcamentoRepository,
         AmbienteRepository ambienteRepository,
-        PedidoRepository pedidoRepository) {
+        PedidoRepository pedidoRepository,
+        ItemOrcamentoRepository itemOrcamentoRepository) {
 
     this.orcamentoRepository = orcamentoRepository;
     this.ambienteRepository = ambienteRepository;
     this.pedidoRepository = pedidoRepository;
+    this.itemOrcamentoRepository=itemOrcamentoRepository;
 }
 
     public OrcamentoResponseDTO salvar(OrcamentoRequestDTO dto) {
@@ -48,15 +54,26 @@ public OrcamentoService(
          );
     }
 
-    if (dto.valor() == null || dto.valor().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+    if (dto.valorMaoObra() == null ||
+        dto.valorMaoObra().compareTo(BigDecimal.ZERO) < 0) {
+
     throw new RuntimeException(
-            "O valor do orçamento deve ser maior que zero."
+            "O valor da mão de obra não pode ser negativo."
     );
 }
 
+if (dto.margemLucro() == null ||
+        dto.margemLucro().compareTo(BigDecimal.ZERO) < 0) {
+
+    throw new RuntimeException(
+            "A margem de lucro não pode ser negativa."
+    );
+}
         Orcamento orcamento = new Orcamento();
 
-        orcamento.setValor(dto.valor());
+        orcamento.setValor(BigDecimal.ZERO);
+        orcamento.setValorMaoObra(dto.valorMaoObra());
+        orcamento.setMargemLucro(dto.margemLucro());
         orcamento.setDescricao(dto.descricao());
         orcamento.setStatus(dto.status());
         orcamento.setAmbiente(ambiente);
@@ -97,13 +114,7 @@ public OrcamentoResponseDTO atualizar(
              );
             }
 
-            if (dto.valor() == null
-        || dto.valor().compareTo(java.math.BigDecimal.ZERO) <= 0) {
-
-    throw new RuntimeException(
-            "O valor do orçamento deve ser maior que zero."
-    );
-}
+            
 
             if (dto.status() == StatusOrcamento.APROVADO
         && orcamento.getDataValidade() != null
@@ -131,12 +142,29 @@ public OrcamentoResponseDTO atualizar(
         }
 
         if (orcamento.getStatus() == StatusOrcamento.APROVADO
-        && (!orcamento.getValor().equals(dto.valor())
+        && (!orcamento.getValorMaoObra().equals(dto.valorMaoObra())
+        || !orcamento.getMargemLucro().equals(dto.margemLucro())
         || !orcamento.getDescricao().equals(dto.descricao())
         || !orcamento.getAmbiente().getId().equals(dto.ambienteId()))) {
 
     throw new RuntimeException(
             "Não é possível alterar os dados de um orçamento aprovado."
+    );
+}
+
+if (dto.valorMaoObra() == null ||
+        dto.valorMaoObra().compareTo(BigDecimal.ZERO) < 0) {
+
+    throw new RuntimeException(
+            "O valor da mão de obra não pode ser negativo."
+    );
+}
+
+if (dto.margemLucro() == null ||
+        dto.margemLucro().compareTo(BigDecimal.ZERO) < 0) {
+
+    throw new RuntimeException(
+            "A margem de lucro não pode ser negativa."
     );
 }
 
@@ -157,14 +185,19 @@ if (orcamento.getStatus() == StatusOrcamento.RECUSADO
 }
 
 
-         orcamento.setValor(dto.valor());
-        orcamento.setDescricao(dto.descricao());
-        orcamento.setStatus(dto.status());
-        
+ orcamento.setValorMaoObra(dto.valorMaoObra());
+orcamento.setMargemLucro(dto.margemLucro());
+orcamento.setDescricao(dto.descricao());
+orcamento.setStatus(dto.status());
 
-         Orcamento orcamentoAtualizado = orcamentoRepository.save(orcamento);
+Orcamento orcamentoAtualizado = orcamentoRepository.save(orcamento);
 
-                 return converterParaResponse(orcamentoAtualizado);
+recalcularValor(orcamentoAtualizado.getId());
+
+orcamentoAtualizado = orcamentoRepository.findById(orcamentoAtualizado.getId())
+        .orElseThrow(() -> new RuntimeException("Orçamento não encontrado"));
+
+return converterParaResponse(orcamentoAtualizado);
 }
 
 
@@ -189,17 +222,66 @@ public void excluir(Long id) {
 }
 
 
+public void recalcularValor(Long orcamentoId) {
+
+    Orcamento orcamento = orcamentoRepository.findById(orcamentoId)
+            .orElseThrow(() ->
+                    new RuntimeException("Orçamento não encontrado"));
+
+    BigDecimal totalMateriais =
+            itemOrcamentoRepository
+                    .findByOrcamentoId(orcamentoId)
+                    .stream()
+                    .map(item ->
+                            item.getQuantidade()
+                                    .multiply(item.getValorUnitario()))
+                    .reduce(
+                            BigDecimal.ZERO,
+                            BigDecimal::add
+                    );
+
+    BigDecimal maoDeObra =
+            orcamento.getValorMaoObra() != null
+                    ? orcamento.getValorMaoObra()
+                    : BigDecimal.ZERO;
+
+    BigDecimal margem =
+            orcamento.getMargemLucro() != null
+                    ? orcamento.getMargemLucro()
+                    : BigDecimal.ZERO;
+
+    BigDecimal custoTotal =
+            totalMateriais.add(maoDeObra);
+
+    BigDecimal lucro =
+            custoTotal
+                    .multiply(margem)
+                    .divide(
+                            BigDecimal.valueOf(100)
+                    );
+
+    BigDecimal valorFinal =
+            custoTotal.add(lucro);
+
+    orcamento.setValor(valorFinal);
+
+    orcamentoRepository.save(orcamento);
+}
+
 private OrcamentoResponseDTO converterParaResponse(Orcamento orcamento) {
 
     return new OrcamentoResponseDTO(
             orcamento.getId(),
             orcamento.getValor(),
+            orcamento.getValorMaoObra(),
+            orcamento.getMargemLucro(),
             orcamento.getDescricao(),
             orcamento.getStatus(),
             orcamento.getDataCriacao(),
             orcamento.getDataValidade(),
             orcamento.getAmbiente().getId(),
-            orcamento.getAmbiente().getNome()
+            orcamento.getAmbiente().getNome(),
+            orcamento.getAmbiente().getProjeto().getNome()
     );
 }
 }

@@ -4,12 +4,7 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import br.edu.ifpr.marcenariapro.dto.ItemProducaoRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.ItemProducaoResponseDTO;
@@ -25,24 +20,37 @@ public class ItemProducaoController {
         this.service = service;
     }
 
+    // Adicionar material à produção
     @PostMapping("/{producaoId}/materiais")
     public ResponseEntity<ItemProducaoResponseDTO> salvar(
             @PathVariable Long producaoId,
             @RequestBody ItemProducaoRequestDTO dto) {
 
+        ItemProducaoResponseDTO item = service.salvar(producaoId, dto);
+
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(service.salvar(producaoId, dto));
+                .body(item);
     }
 
-   
+    // Listar materiais da produção
+    @GetMapping("/{producaoId}/materiais")
+    public ResponseEntity<List<ItemProducaoResponseDTO>> listarPorProducao(
+            @PathVariable Long producaoId) {
 
-@GetMapping("/{producaoId}/materiais")
-public ResponseEntity<List<ItemProducaoResponseDTO>> listarPorProducao(
-        @PathVariable Long producaoId) {
+        return ResponseEntity.ok(
+                service.listarPorProducao(producaoId)
+        );
+    }
 
-    return ResponseEntity.ok(
-            service.listarPorProducao(producaoId)
-    );
-}
+    // Remover material da produção
+    @DeleteMapping("/{producaoId}/materiais/{itemId}")
+    public ResponseEntity<Void> excluir(
+            @PathVariable Long producaoId,
+            @PathVariable Long itemId) {
+
+        service.excluir(producaoId, itemId);
+
+        return ResponseEntity.noContent().build();
+    }
 }
