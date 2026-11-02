@@ -27,6 +27,9 @@ public class Pagamento {
     private LocalDateTime dataPagamento;
 
     private String descricao;
+    private String nomeComprovante;
+
+    private String caminhoComprovante;
 
     @Enumerated(EnumType.STRING)
     private StatusPagamento status;
@@ -82,4 +85,20 @@ public class Pagamento {
     public void setPedido(Pedido pedido) {
         this.pedido = pedido;
     }
+
+    public String getNomeComprovante() {
+    return nomeComprovante;
+}
+
+public void setNomeComprovante(String nomeComprovante) {
+    this.nomeComprovante = nomeComprovante;
+}
+
+public String getCaminhoComprovante() {
+    return caminhoComprovante;
+}
+
+public void setCaminhoComprovante(String caminhoComprovante) {
+    this.caminhoComprovante = caminhoComprovante;
+}
 }

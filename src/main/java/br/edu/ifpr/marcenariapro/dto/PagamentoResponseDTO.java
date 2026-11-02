@@ -11,5 +11,7 @@ public record PagamentoResponseDTO(
         LocalDateTime dataPagamento,
         String descricao,
         StatusPagamento status,
-        Long pedidoId
+        Long pedidoId,
+        boolean possuiComprovante,
+        String urlComprovante
 ) {}
