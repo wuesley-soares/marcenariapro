@@ -1,7 +1,10 @@
+
 package br.edu.ifpr.marcenariapro.service;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import br.edu.ifpr.marcenariapro.dto.LoginRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.LoginResponseDTO;
@@ -30,21 +33,27 @@ public class AuthService {
 
         Usuario usuario = repository.findByEmail(dto.email())
                 .orElseThrow(() ->
-                        new RuntimeException(
-                                "E-mail ou senha inválidos"));
+                        new ResponseStatusException(
+                                HttpStatus.UNAUTHORIZED,
+                                "E-mail ou senha inválidos"
+                        ));
 
         if (!passwordEncoder.matches(
                 dto.senha(),
                 usuario.getSenha())) {
 
-            throw new RuntimeException(
-                    "E-mail ou senha inválidos");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "E-mail ou senha inválidos"
+            );
         }
 
-        if (!usuario.getAtivo()) {
+        if (!Boolean.TRUE.equals(usuario.getAtivo())) {
 
-            throw new RuntimeException(
-                    "Usuário inativo");
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Usuário inativo"
+            );
         }
 
         String token = jwtService.gerarToken(usuario);

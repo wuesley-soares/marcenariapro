@@ -1,9 +1,12 @@
+
 package br.edu.ifpr.marcenariapro.controller;
 
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import jakarta.validation.Valid;
 
 import br.edu.ifpr.marcenariapro.dto.LoginRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.LoginResponseDTO;
@@ -20,7 +23,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public LoginResponseDTO login(@RequestBody LoginRequestDTO dto) {
+    public LoginResponseDTO login(
+            @Valid @RequestBody LoginRequestDTO dto) {
+
         return service.login(dto);
     }
 }

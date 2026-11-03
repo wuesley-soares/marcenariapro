@@ -45,7 +45,8 @@ public UsuarioResponseDTO atualizar(
 @PutMapping("/{id}/senha")
 public void alterarSenha(
         @PathVariable Long id,
-        @RequestBody UsuarioSenhaDTO dto) {
+        @Valid @RequestBody UsuarioSenhaDTO dto) {
+
     service.alterarSenha(id, dto);
 }
 }
