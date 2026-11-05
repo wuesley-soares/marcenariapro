@@ -17,7 +17,7 @@ import io.jsonwebtoken.security.Keys;
 public class JwtService {
 
     private static final long TOKEN_EXPIRATION =
-            8 * 60 * 60 * 1000L;
+        2 * 60 * 60 * 1000L;
 
     private final SecretKey key;
 
