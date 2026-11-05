@@ -61,11 +61,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 usuarioRepository.findByEmail(email)
                         .orElse(null);
 
-if (usuario != null) {
-    System.out.println("Usuário autenticado: " + usuario.getEmail());
-    System.out.println("Perfil no banco: " + usuario.getPerfil());
-    System.out.println("Ativo: " + usuario.getAtivo());
-}
+
 
 if (usuario == null || !Boolean.TRUE.equals(usuario.getAtivo())) {
     filterChain.doFilter(request, response);
