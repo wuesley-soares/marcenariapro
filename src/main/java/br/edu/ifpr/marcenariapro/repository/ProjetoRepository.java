@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import java.util.List;
 
 import br.edu.ifpr.marcenariapro.entity.Projeto;
 
@@ -19,4 +20,6 @@ public interface ProjetoRepository extends JpaRepository<Projeto, Long> {
     """)
     BigDecimal somarOrcamentosPorProjeto(
             @Param("projetoId") Long projetoId);
+
+            List<Projeto> findByClienteId(Long clienteId);
 }

@@ -6,6 +6,29 @@ import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+
+import org.springframework.transaction.annotation.Transactional;
+
+import br.edu.ifpr.marcenariapro.dto.AmbienteClienteDTO;
+import br.edu.ifpr.marcenariapro.dto.ClienteDetalheDTO;
+import br.edu.ifpr.marcenariapro.dto.FinanceiroClienteDTO;
+import br.edu.ifpr.marcenariapro.dto.ProjetoClienteDTO;
+
+import br.edu.ifpr.marcenariapro.entity.Ambiente;
+import br.edu.ifpr.marcenariapro.entity.Orcamento;
+import br.edu.ifpr.marcenariapro.entity.Pedido;
+import br.edu.ifpr.marcenariapro.entity.Pagamento;
+import br.edu.ifpr.marcenariapro.entity.Projeto;
+
+import br.edu.ifpr.marcenariapro.enums.StatusPedido;
+import br.edu.ifpr.marcenariapro.enums.StatusPagamento;
+
+import br.edu.ifpr.marcenariapro.repository.AmbienteRepository;
+import br.edu.ifpr.marcenariapro.repository.OrcamentoRepository;
+import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
+import br.edu.ifpr.marcenariapro.repository.PagamentoRepository;
 
 import br.edu.ifpr.marcenariapro.dto.ClienteRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.ClienteResponseDTO;
@@ -20,16 +43,28 @@ public class ClienteService {
     private final ClienteRepository repository;
     private final ProjetoRepository projetoRepository;
     private final AssistenciaTecnicaRepository assistenciaTecnicaRepository;
+    private final AmbienteRepository ambienteRepository;
+    private final OrcamentoRepository orcamentoRepository;
+    private final PedidoRepository pedidoRepository;
+    private final PagamentoRepository pagamentoRepository;
 
-    public ClienteService(
-            ClienteRepository repository,
-            ProjetoRepository projetoRepository,
-            AssistenciaTecnicaRepository assistenciaTecnicaRepository) {
+public ClienteService(
+        ClienteRepository repository,
+        ProjetoRepository projetoRepository,
+        AssistenciaTecnicaRepository assistenciaTecnicaRepository,
+        AmbienteRepository ambienteRepository,
+        OrcamentoRepository orcamentoRepository,
+        PedidoRepository pedidoRepository,
+        PagamentoRepository pagamentoRepository) {
 
-        this.repository = repository;
-        this.projetoRepository = projetoRepository;
-        this.assistenciaTecnicaRepository = assistenciaTecnicaRepository;
-    }
+    this.repository = repository;
+    this.projetoRepository = projetoRepository;
+    this.assistenciaTecnicaRepository = assistenciaTecnicaRepository;
+    this.ambienteRepository = ambienteRepository;
+    this.orcamentoRepository = orcamentoRepository;
+    this.pedidoRepository = pedidoRepository;
+    this.pagamentoRepository = pagamentoRepository;
+}
 
     public ClienteResponseDTO salvar(ClienteRequestDTO dto) {
 
@@ -270,6 +305,222 @@ public class ClienteService {
                 cliente.getDataCadastro()
         );
     }
+    @Transactional(readOnly = true)
+public ClienteDetalheDTO buscarDetalhes(Long clienteId) {
+
+    Cliente cliente = repository.findById(clienteId)
+            .orElseThrow(() ->
+                    new RuntimeException("Cliente não encontrado."));
+
+    List<Projeto> projetos =
+            projetoRepository.findByClienteId(clienteId);
+
+    List<ProjetoClienteDTO> projetosDTO = new ArrayList<>();
+
+    for (Projeto projeto : projetos) {
+
+        List<Ambiente> ambientes =
+                ambienteRepository.findByProjetoId(projeto.getId());
+
+        List<AmbienteClienteDTO> ambientesDTO = new ArrayList<>();
+
+        for (Ambiente ambiente : ambientes) {
+
+            Orcamento orcamento = orcamentoRepository
+                    .findByAmbienteId(ambiente.getId())
+                    .orElse(null);
+
+            BigDecimal valorOrcamento = BigDecimal.ZERO;
+            String statusOrcamento = null;
+
+            Long pedidoId = null;
+            String statusPedido = null;
+
+            BigDecimal valorPago = BigDecimal.ZERO;
+            BigDecimal saldoRestante = BigDecimal.ZERO;
+            String situacaoFinanceira = "SEM_PEDIDO";
+
+            if (orcamento != null) {
+
+                valorOrcamento = orcamento.getValor() != null
+                        ? orcamento.getValor()
+                        : BigDecimal.ZERO;
+
+                statusOrcamento = orcamento.getStatus() != null
+                        ? orcamento.getStatus().name()
+                        : null;
+
+                Pedido pedido = pedidoRepository
+                        .findByOrcamentoId(orcamento.getId())
+                        .orElse(null);
+
+                if (pedido != null) {
+
+                    pedidoId = pedido.getId();
+
+                    statusPedido = pedido.getStatus() != null
+                            ? pedido.getStatus().name()
+                            : null;
+
+                    valorPago = somarPagamentosPagos(pedido);
+
+                    if (pedido.getStatus() == StatusPedido.CANCELADO) {
+
+                        situacaoFinanceira = "CANCELADO";
+
+                    } else {
+
+                        saldoRestante = valorOrcamento.subtract(valorPago);
+
+                        if (saldoRestante.compareTo(BigDecimal.ZERO) < 0) {
+                            saldoRestante = BigDecimal.ZERO;
+                        }
+
+                        situacaoFinanceira =
+                                determinarSituacaoFinanceira(
+                                        valorPago,
+                                        saldoRestante);
+                    }
+                }
+            }
+
+            ambientesDTO.add(new AmbienteClienteDTO(
+                    ambiente.getId(),
+                    ambiente.getNome(),
+                    valorOrcamento,
+                    statusOrcamento,
+                    pedidoId,
+                    statusPedido,
+                    valorPago,
+                    saldoRestante,
+                    situacaoFinanceira
+            ));
+        }
+
+        projetosDTO.add(new ProjetoClienteDTO(
+                projeto.getId(),
+                projeto.getNome(),
+                ambientesDTO
+        ));
+    }
+
+    FinanceiroClienteDTO financeiro = calcularFinanceiro(clienteId);
+
+    return new ClienteDetalheDTO(
+            converterParaResponse(cliente),
+            financeiro,
+            projetosDTO
+    );
+}
+
+@Transactional(readOnly = true)
+public FinanceiroClienteDTO buscarFinanceiro(Long clienteId) {
+
+    if (!repository.existsById(clienteId)) {
+        throw new RuntimeException("Cliente não encontrado.");
+    }
+
+    return calcularFinanceiro(clienteId);
+}
+
+private FinanceiroClienteDTO calcularFinanceiro(Long clienteId) {
+
+    BigDecimal totalPedidos = BigDecimal.ZERO;
+    BigDecimal totalPago = BigDecimal.ZERO;
+
+    long quantidadePedidos = 0;
+
+    List<Projeto> projetos =
+            projetoRepository.findByClienteId(clienteId);
+
+    for (Projeto projeto : projetos) {
+
+        List<Ambiente> ambientes =
+                ambienteRepository.findByProjetoId(projeto.getId());
+
+        for (Ambiente ambiente : ambientes) {
+
+            Orcamento orcamento = orcamentoRepository
+                    .findByAmbienteId(ambiente.getId())
+                    .orElse(null);
+
+            if (orcamento == null) {
+                continue;
+            }
+
+            Pedido pedido = pedidoRepository
+                    .findByOrcamentoId(orcamento.getId())
+                    .orElse(null);
+
+            if (pedido == null
+                    || pedido.getStatus() == StatusPedido.CANCELADO) {
+                continue;
+            }
+
+            BigDecimal valorPedido = orcamento.getValor() != null
+                    ? orcamento.getValor()
+                    : BigDecimal.ZERO;
+
+            totalPedidos = totalPedidos.add(valorPedido);
+
+            totalPago = totalPago.add(
+                    somarPagamentosPagos(pedido));
+
+            quantidadePedidos++;
+        }
+    }
+
+    BigDecimal saldoReceber = totalPedidos.subtract(totalPago);
+
+    if (saldoReceber.compareTo(BigDecimal.ZERO) < 0) {
+        saldoReceber = BigDecimal.ZERO;
+    }
+
+    String situacao;
+
+    if (quantidadePedidos == 0) {
+        situacao = "SEM_PEDIDOS";
+    } else if (saldoReceber.compareTo(BigDecimal.ZERO) == 0) {
+        situacao = "QUITADO";
+    } else {
+        situacao = "COM_SALDO_A_RECEBER";
+    }
+
+    return new FinanceiroClienteDTO(
+            totalPedidos,
+            totalPago,
+            saldoReceber,
+            quantidadePedidos,
+            situacao
+    );
+}
+
+private BigDecimal somarPagamentosPagos(Pedido pedido) {
+
+    List<Pagamento> pagamentos =
+            pagamentoRepository.findByPedidoId(pedido.getId());
+
+    return pagamentos.stream()
+            .filter(p -> p.getStatus() == StatusPagamento.PAGO)
+            .map(Pagamento::getValor)
+            .filter(valor -> valor != null)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+}
+
+private String determinarSituacaoFinanceira(
+        BigDecimal valorPago,
+        BigDecimal saldoRestante) {
+
+    if (saldoRestante.compareTo(BigDecimal.ZERO) == 0) {
+        return "QUITADO";
+    }
+
+    if (valorPago.compareTo(BigDecimal.ZERO) > 0) {
+        return "PARCIALMENTE_PAGO";
+    }
+
+    return "PENDENTE";
+}
 
     public void excluir(Long id) {
 

@@ -12,5 +12,6 @@ public interface OrcamentoRepository extends JpaRepository<Orcamento, Long> {
 
     Optional<Orcamento> findByAmbienteId(Long ambienteId);
     long countByAmbienteId(Long ambienteId);
+   
 
 }

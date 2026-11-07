@@ -13,9 +13,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import br.edu.ifpr.marcenariapro.dto.ClienteDetalheDTO;
 import br.edu.ifpr.marcenariapro.dto.ClienteRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.ClienteResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.FinanceiroClienteDTO;
 import br.edu.ifpr.marcenariapro.service.ClienteService;
+import br.edu.ifpr.marcenariapro.dto.ClienteDetalheDTO;
+import br.edu.ifpr.marcenariapro.dto.FinanceiroClienteDTO;
 
 
 @RestController
@@ -70,4 +74,19 @@ public class ClienteController {
 
         return ResponseEntity.noContent().build();
     }
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
+@GetMapping("/{id}/detalhes")
+public ResponseEntity<ClienteDetalheDTO> buscarDetalhes(
+        @PathVariable Long id) {
+
+    return ResponseEntity.ok(service.buscarDetalhes(id));
+}
+
+@PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
+@GetMapping("/{id}/financeiro")
+public ResponseEntity<FinanceiroClienteDTO> buscarFinanceiro(
+        @PathVariable Long id) {
+
+    return ResponseEntity.ok(service.buscarFinanceiro(id));
+}
 }
