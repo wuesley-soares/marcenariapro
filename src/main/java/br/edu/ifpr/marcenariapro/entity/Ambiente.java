@@ -23,6 +23,8 @@ public class Ambiente {
     private String descricao;
 
     private LocalDateTime dataCriacao;
+    private String caminhoDocumento;
+    private String nomeDocumento;   
     @ManyToOne
     @JoinColumn(name = "projeto_id")
     private Projeto projeto;
@@ -61,4 +63,19 @@ public class Ambiente {
     public void setProjeto(Projeto projeto) {
     this.projeto = projeto;
     }
+    public String getCaminhoDocumento() {
+    return caminhoDocumento;
+}
+
+public void setCaminhoDocumento(String caminhoDocumento) {
+    this.caminhoDocumento = caminhoDocumento;
+}
+
+public String getNomeDocumento() {
+    return nomeDocumento;
+}
+
+public void setNomeDocumento(String nomeDocumento) {
+    this.nomeDocumento = nomeDocumento;
+}
 }

@@ -23,6 +23,8 @@ public class Projeto {
     private String descricao;
 
     private LocalDateTime dataCriacao;
+    private String caminhoDocumento;
+    private String nomeDocumento;
 
     @ManyToOne
     @JoinColumn(name = "cliente_id")
@@ -62,4 +64,19 @@ public class Projeto {
     public void setCliente(Cliente cliente) {
     this.cliente = cliente;
     }
+    public String getCaminhoDocumento() {
+    return caminhoDocumento;
+}
+
+public void setCaminhoDocumento(String caminhoDocumento) {
+    this.caminhoDocumento = caminhoDocumento;
+}
+
+public String getNomeDocumento() {
+    return nomeDocumento;
+}
+
+public void setNomeDocumento(String nomeDocumento) {
+    this.nomeDocumento = nomeDocumento;
+}
 }

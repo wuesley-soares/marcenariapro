@@ -37,18 +37,14 @@ public class ComprovanteService {
                 .normalize();
     }
 
+    // Mantém o comportamento atual dos comprovantes de pagamento.
     public String salvar(MultipartFile arquivo) {
 
         if (arquivo == null || arquivo.isEmpty()) {
             return null;
         }
 
-        if (arquivo.getSize() > TAMANHO_MAXIMO) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "O comprovante não pode ultrapassar 5 MB."
-            );
-        }
+        validarTamanho(arquivo);
 
         String tipo = arquivo.getContentType();
 
@@ -59,14 +55,79 @@ public class ComprovanteService {
             );
         }
 
-        String nomeOriginal = arquivo.getOriginalFilename();
-        String extensao = obterExtensao(nomeOriginal);
+        String extensao = obterExtensao(
+                arquivo.getOriginalFilename(),
+                Set.of(".pdf", ".jpg", ".jpeg", ".png")
+        );
+
+        return salvarArquivo(arquivo, extensao);
+    }
+
+    // Novo método: aceita exclusivamente PDF.
+    public String salvarPdf(MultipartFile arquivo) {
+
+        if (arquivo == null || arquivo.isEmpty()) {
+            return null;
+        }
+
+        validarTamanho(arquivo);
+
+        String tipo = arquivo.getContentType();
+
+        if (!"application/pdf".equalsIgnoreCase(tipo)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Formato inválido. Envie somente arquivos PDF."
+            );
+        }
+
+        String extensao = obterExtensao(
+                arquivo.getOriginalFilename(),
+                Set.of(".pdf")
+        );
+
+        try {
+            byte[] inicio = new byte[5];
+
+            try (var input = arquivo.getInputStream()) {
+                if (input.read(inicio) != 5
+                        || !new String(inicio).equals("%PDF-")) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "O arquivo enviado não é um PDF válido."
+                    );
+                }
+            }
+
+        } catch (IOException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Não foi possível verificar o arquivo PDF."
+            );
+        }
+
+        return salvarArquivo(arquivo, extensao);
+    }
+
+    private void validarTamanho(MultipartFile arquivo) {
+
+        if (arquivo.getSize() > TAMANHO_MAXIMO) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "O arquivo não pode ultrapassar 5 MB."
+            );
+        }
+    }
+
+    private String salvarArquivo(MultipartFile arquivo, String extensao) {
+
         String nomeSeguro = UUID.randomUUID() + extensao;
 
         try {
             Files.createDirectories(diretorio);
 
-            Path destino = diretorio.resolve(nomeSeguro).normalize();
+            Path destino = diretorio.resolve(nomeSeguro)
+                    .normalize();
 
             if (!destino.startsWith(diretorio)) {
                 throw new ResponseStatusException(
@@ -82,7 +143,7 @@ public class ComprovanteService {
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.INTERNAL_SERVER_ERROR,
-                    "Não foi possível salvar o comprovante."
+                    "Não foi possível salvar o arquivo."
             );
         }
     }
@@ -98,7 +159,7 @@ public class ComprovanteService {
                     || !Files.isRegularFile(arquivo)) {
                 throw new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
-                        "Comprovante não encontrado."
+                        "Arquivo não encontrado."
                 );
             }
 
@@ -107,12 +168,37 @@ public class ComprovanteService {
         } catch (IOException e) {
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
-                    "Não foi possível localizar o comprovante."
+                    "Não foi possível localizar o arquivo."
             );
         }
     }
 
-    private String obterExtensao(String nome) {
+    public void excluir(String caminho) {
+
+        if (caminho == null || caminho.isBlank()) {
+            return;
+        }
+
+        try {
+            Path arquivo = Paths.get(caminho)
+                    .toAbsolutePath()
+                    .normalize();
+
+            if (arquivo.startsWith(diretorio)) {
+                Files.deleteIfExists(arquivo);
+            }
+
+        } catch (IOException e) {
+            throw new ResponseStatusException(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    "Não foi possível excluir o arquivo antigo."
+            );
+        }
+    }
+
+    private String obterExtensao(
+            String nome,
+            Set<String> extensoesPermitidas) {
 
         if (nome == null || !nome.contains(".")) {
             throw new ResponseStatusException(
@@ -124,7 +210,7 @@ public class ComprovanteService {
         String extensao = nome.substring(nome.lastIndexOf("."))
                 .toLowerCase();
 
-        if (!Set.of(".pdf", ".jpg", ".jpeg", ".png").contains(extensao)) {
+        if (!extensoesPermitidas.contains(extensao)) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Extensão de arquivo não permitida."

@@ -10,5 +10,6 @@ public record ProjetoResponseDTO(
         LocalDateTime dataCriacao,
         Long clienteId,
         String clienteNome,
-        BigDecimal valorTotal
+        BigDecimal valorTotal,
+        String nomeDocumento
 ) {}
