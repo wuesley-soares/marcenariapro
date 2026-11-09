@@ -1,6 +1,5 @@
 package br.edu.ifpr.marcenariapro.service;
 
-
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
@@ -12,12 +11,15 @@ import br.edu.ifpr.marcenariapro.dto.AssistenciaTecnicaRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.AssistenciaTecnicaResponseDTO;
 import br.edu.ifpr.marcenariapro.dto.ItemAssistenciaTecnicaRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.ItemAssistenciaTecnicaResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.MovimentacaoEstoqueRequestDTO;
 import br.edu.ifpr.marcenariapro.entity.AssistenciaTecnica;
 import br.edu.ifpr.marcenariapro.entity.Cliente;
 import br.edu.ifpr.marcenariapro.entity.ItemAssistenciaTecnica;
 import br.edu.ifpr.marcenariapro.entity.Material;
 import br.edu.ifpr.marcenariapro.entity.Pedido;
 import br.edu.ifpr.marcenariapro.entity.Usuario;
+import br.edu.ifpr.marcenariapro.enums.StatusAssistencia;
+import br.edu.ifpr.marcenariapro.enums.TipoMovimentacao;
 import br.edu.ifpr.marcenariapro.repository.AssistenciaTecnicaRepository;
 import br.edu.ifpr.marcenariapro.repository.ClienteRepository;
 import br.edu.ifpr.marcenariapro.repository.ItemAssistenciaTecnicaRepository;
@@ -25,16 +27,20 @@ import br.edu.ifpr.marcenariapro.repository.MaterialRepository;
 import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
 import br.edu.ifpr.marcenariapro.repository.UsuarioRepository;
 
-
 @Service
+@Transactional
 public class AssistenciaTecnicaService {
 
+
+private final ImagemAssistenciaTecnicaService imagemAssistenciaTecnicaService;
     private final AssistenciaTecnicaRepository assistenciaRepository;
     private final ClienteRepository clienteRepository;
     private final PedidoRepository pedidoRepository;
     private final UsuarioRepository usuarioRepository;
     private final ItemAssistenciaTecnicaRepository itemAssistenciaRepository;
     private final MaterialRepository materialRepository;
+    private final ReservaMaterialService reservaMaterialService;
+    private final MovimentacaoEstoqueService movimentacaoEstoqueService;
 
 public AssistenciaTecnicaService(
         AssistenciaTecnicaRepository assistenciaRepository,
@@ -42,7 +48,10 @@ public AssistenciaTecnicaService(
         PedidoRepository pedidoRepository,
         UsuarioRepository usuarioRepository,
         ItemAssistenciaTecnicaRepository itemAssistenciaRepository,
-        MaterialRepository materialRepository) {
+        MaterialRepository materialRepository,
+        ReservaMaterialService reservaMaterialService,
+        MovimentacaoEstoqueService movimentacaoEstoqueService,
+        ImagemAssistenciaTecnicaService imagemAssistenciaTecnicaService) {
 
     this.assistenciaRepository = assistenciaRepository;
     this.clienteRepository = clienteRepository;
@@ -50,25 +59,43 @@ public AssistenciaTecnicaService(
     this.usuarioRepository = usuarioRepository;
     this.itemAssistenciaRepository = itemAssistenciaRepository;
     this.materialRepository = materialRepository;
+    this.reservaMaterialService = reservaMaterialService;
+    this.movimentacaoEstoqueService = movimentacaoEstoqueService;
+    this.imagemAssistenciaTecnicaService = imagemAssistenciaTecnicaService;
 }
+
     public AssistenciaTecnicaResponseDTO salvar(
             AssistenciaTecnicaRequestDTO dto) {
+
+        validarDataEntrega(dto.dataEntregaOriginal());
 
         Cliente cliente = clienteRepository.findById(dto.clienteId())
                 .orElseThrow(() ->
                         new RuntimeException("Cliente não encontrado"));
 
-                 Pedido pedido = null;
+        Pedido pedido = null;
 
-                if (dto.pedidoId() != null) {
-                pedido = pedidoRepository.findById(dto.pedidoId())
-                        .orElseThrow(() ->
-                                new RuntimeException("Pedido não encontrado"));
-                }
+        if (dto.pedidoId() != null) {
+            pedido = pedidoRepository.findById(dto.pedidoId())
+                    .orElseThrow(() ->
+                            new RuntimeException("Pedido não encontrado"));
+        }
 
         Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
                 .orElseThrow(() ->
                         new RuntimeException("Funcionário não encontrado"));
+
+        StatusAssistencia status = dto.status() == null
+                ? StatusAssistencia.ABERTA
+                : dto.status();
+
+        if (status != StatusAssistencia.ABERTA
+                && status != StatusAssistencia.AGENDADA) {
+
+            throw new RuntimeException(
+                    "Uma nova assistência deve iniciar como ABERTA ou AGENDADA."
+            );
+        }
 
         AssistenciaTecnica assistencia = new AssistenciaTecnica();
 
@@ -76,24 +103,21 @@ public AssistenciaTecnicaService(
         assistencia.setDataAgendamento(dto.dataAgendamento());
         assistencia.setDescricao(dto.descricao());
         assistencia.setDataEntregaOriginal(dto.dataEntregaOriginal());
-
         assistencia.setValorServico(dto.valorServico());
-        assistencia.setValorMateriais(dto.valorMateriais());
-
-        assistencia.setStatus(dto.status());
-
+        assistencia.setValorMateriais(0.0);
+        assistencia.setStatus(status);
         assistencia.setCliente(cliente);
         assistencia.setPedido(pedido);
         assistencia.setFuncionario(funcionario);
 
         verificarGarantia(assistencia);
 
-        AssistenciaTecnica salva =
-                assistenciaRepository.save(assistencia);
-
-        return converterParaResponse(salva);
+        return converterParaResponse(
+                assistenciaRepository.save(assistencia)
+        );
     }
 
+    @Transactional(readOnly = true)
     public List<AssistenciaTecnicaResponseDTO> listar() {
 
         return assistenciaRepository.findAll()
@@ -102,269 +126,398 @@ public AssistenciaTecnicaService(
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public AssistenciaTecnicaResponseDTO buscarPorId(Long id) {
 
-        AssistenciaTecnica assistencia =
-                assistenciaRepository.findById(id)
-                        .orElseThrow(() ->
-                                new RuntimeException(
-                                        "Assistência técnica não encontrada"));
+        AssistenciaTecnica assistencia = buscarAssistencia(id);
 
         return converterParaResponse(assistencia);
     }
 
     public AssistenciaTecnicaResponseDTO atualizar(
-        Long id,
-        AssistenciaTecnicaRequestDTO dto) {
+            Long id,
+            AssistenciaTecnicaRequestDTO dto) {
 
-    AssistenciaTecnica assistencia =
-            assistenciaRepository.findById(id)
+        AssistenciaTecnica assistencia = buscarAssistencia(id);
+
+        validarDataEntrega(dto.dataEntregaOriginal());
+
+        Cliente cliente = clienteRepository.findById(dto.clienteId())
+                .orElseThrow(() ->
+                        new RuntimeException("Cliente não encontrado"));
+
+        Pedido pedido = null;
+
+        if (dto.pedidoId() != null) {
+            pedido = pedidoRepository.findById(dto.pedidoId())
                     .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Assistência técnica não encontrada"));
+                            new RuntimeException("Pedido não encontrado"));
+        }
 
-    Cliente cliente = clienteRepository.findById(dto.clienteId())
-            .orElseThrow(() ->
-                    new RuntimeException("Cliente não encontrado"));
+        Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
+                .orElseThrow(() ->
+                        new RuntimeException("Funcionário não encontrado"));
 
-                Pedido pedido = null;
+        if (assistencia.getStatus() == StatusAssistencia.CONCLUIDA
+                || assistencia.getStatus() == StatusAssistencia.CANCELADA) {
 
-                if (dto.pedidoId() != null) {
-                pedido = pedidoRepository.findById(dto.pedidoId())
-                        .orElseThrow(() ->
-                                new RuntimeException("Pedido não encontrado"));
-                }
+            throw new RuntimeException(
+                    "Não é possível editar uma assistência concluída ou cancelada."
+            );
+        }
 
-    Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
-            .orElseThrow(() ->
-                    new RuntimeException("Funcionário não encontrado"));
+        assistencia.setDataSolicitacao(dto.dataSolicitacao());
+        assistencia.setDataAgendamento(dto.dataAgendamento());
+        assistencia.setDescricao(dto.descricao());
+        assistencia.setDataEntregaOriginal(dto.dataEntregaOriginal());
+        assistencia.setCliente(cliente);
+        assistencia.setPedido(pedido);
+        assistencia.setFuncionario(funcionario);
 
-    assistencia.setDataSolicitacao(dto.dataSolicitacao());
-    assistencia.setDataAgendamento(dto.dataAgendamento());
-    assistencia.setDescricao(dto.descricao());
-    assistencia.setDataEntregaOriginal(dto.dataEntregaOriginal());
-    assistencia.setStatus(dto.status());
-    assistencia.setValorServico(dto.valorServico());
-    assistencia.setValorMateriais(dto.valorMateriais());
+        if (dto.valorServico() != null && dto.valorServico() < 0) {
+            throw new RuntimeException(
+                    "O valor do serviço não pode ser negativo."
+            );
+        }
 
-    assistencia.setCliente(cliente);
-    assistencia.setPedido(pedido);
-    assistencia.setFuncionario(funcionario);
+        assistencia.setValorServico(dto.valorServico());
 
-    verificarGarantia(assistencia);
+        if (dto.status() != null
+                && dto.status() != assistencia.getStatus()) {
 
-    AssistenciaTecnica atualizada =
-            assistenciaRepository.save(assistencia);
+            alterarStatus(assistencia, dto.status());
+        }
 
-    return converterParaResponse(atualizada);
-}
+        calcularValorMateriais(assistencia);
 
-@Transactional
-public void excluir(Long id) {
-
-    AssistenciaTecnica assistencia =
-            assistenciaRepository.findById(id)
-                    .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Assistência técnica não encontrada"));
-
-    List<ItemAssistenciaTecnica> itens =
-            itemAssistenciaRepository
-                    .findByAssistenciaId(assistencia.getId());
-
-    for (ItemAssistenciaTecnica item : itens) {
-
-        Material material = item.getMaterial();
-
-        material.setQuantidade(
-                material.getQuantidade() + item.getQuantidade());
-
-        materialRepository.save(material);
+        return converterParaResponse(
+                assistenciaRepository.save(assistencia)
+        );
     }
 
-    itemAssistenciaRepository.deleteByAssistenciaId(assistencia.getId());
+    public ItemAssistenciaTecnicaResponseDTO adicionarMaterial(
+            Long assistenciaId,
+            ItemAssistenciaTecnicaRequestDTO dto) {
+
+        AssistenciaTecnica assistencia = buscarAssistencia(assistenciaId);
+
+        validarPermissaoAlterarMateriais(assistencia);
+
+        if (dto.quantidade() == null || dto.quantidade() <= 0) {
+            throw new RuntimeException(
+                    "A quantidade deve ser maior que zero."
+            );
+        }
+
+        Material material = materialRepository.findById(dto.materialId())
+                .orElseThrow(() ->
+                        new RuntimeException("Material não encontrado"));
+
+        ItemAssistenciaTecnica item = new ItemAssistenciaTecnica();
+
+        item.setQuantidade(dto.quantidade());
+        item.setAssistencia(assistencia);
+        item.setMaterial(material);
+
+        ItemAssistenciaTecnica salvo =
+                itemAssistenciaRepository.save(item);
+
+        // Reserva o material sem alterar o estoque físico.
+        // Se faltar, cria uma necessidade de compra.
+        reservaMaterialService.reservarItemAssistencia(salvo);
+
+        calcularValorMateriais(assistencia);
+
+        assistenciaRepository.save(assistencia);
+
+        return converterItemParaResponse(salvo);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ItemAssistenciaTecnicaResponseDTO> listarMateriais(
+            Long assistenciaId) {
+
+        AssistenciaTecnica assistencia = buscarAssistencia(assistenciaId);
+
+        return itemAssistenciaRepository
+                .findByAssistenciaId(assistencia.getId())
+                .stream()
+                .map(this::converterItemParaResponse)
+                .toList();
+    }
+
+    public void excluirMaterial(
+            Long assistenciaId,
+            Long itemId) {
+
+        AssistenciaTecnica assistencia = buscarAssistencia(assistenciaId);
+
+        validarPermissaoAlterarMateriais(assistencia);
+
+        ItemAssistenciaTecnica item =
+                itemAssistenciaRepository.findById(itemId)
+                        .orElseThrow(() ->
+                                new RuntimeException(
+                                        "Material da assistência não encontrado"
+                                ));
+
+        if (!item.getAssistencia().getId().equals(assistenciaId)) {
+            throw new RuntimeException(
+                    "O material não pertence a esta assistência."
+            );
+        }
+
+        // O material ainda não foi consumido.
+        // Portanto, não existe entrada física a registrar.
+        reservaMaterialService.removerReservaAssistencia(item.getId());
+
+        itemAssistenciaRepository.delete(item);
+
+        calcularValorMateriais(assistencia);
+
+        assistenciaRepository.save(assistencia);
+    }
+
+    public void excluir(Long id) {
+
+    AssistenciaTecnica assistencia = buscarAssistencia(id);
+
+    validarPermissaoAlterarMateriais(assistencia);
+
+    // Exclui os arquivos e registros das imagens.
+    imagemAssistenciaTecnicaService.excluirTodas(id);
+
+    List<ItemAssistenciaTecnica> itens =
+            itemAssistenciaRepository.findByAssistenciaId(id);
+
+    for (ItemAssistenciaTecnica item : itens) {
+        reservaMaterialService.removerReservaAssistencia(item.getId());
+    }
+
+    itemAssistenciaRepository.deleteByAssistenciaId(id);
 
     assistenciaRepository.delete(assistencia);
 }
+    private void alterarStatus(
+            AssistenciaTecnica assistencia,
+            StatusAssistencia novoStatus) {
 
-    public ItemAssistenciaTecnicaResponseDTO adicionarMaterial(
-        Long assistenciaId,
-        ItemAssistenciaTecnicaRequestDTO dto) {
+        StatusAssistencia atual = assistencia.getStatus();
 
-    AssistenciaTecnica assistencia =
-            assistenciaRepository.findById(assistenciaId)
-                    .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Assistência técnica não encontrada"));
-
-    Material material =
-            materialRepository.findById(dto.materialId())
-                    .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Material não encontrado"));
-
-   if (dto.quantidade() <= 0) {
-    throw new RuntimeException(
-            "A quantidade deve ser maior que zero");
-}
-
-if (material.getQuantidade() < dto.quantidade()) {
-    throw new RuntimeException(
-            "Quantidade insuficiente em estoque");
-}
-
-ItemAssistenciaTecnica item = new ItemAssistenciaTecnica();
-
-item.setQuantidade(dto.quantidade());
-item.setAssistencia(assistencia);
-item.setMaterial(material);
-
-ItemAssistenciaTecnica salvo =
-        itemAssistenciaRepository.save(item);
-
-material.setQuantidade(
-        material.getQuantidade() - dto.quantidade()
-);
-
-materialRepository.save(material);
-
-calcularValorMateriais(assistencia);
-assistenciaRepository.save(assistencia);
-
-    return new ItemAssistenciaTecnicaResponseDTO(
-            salvo.getId(),
-            salvo.getQuantidade(),
-            material.getId(),
-            material.getNome()
-        );
+        if (atual == novoStatus) {
+            return;
         }
 
-       private void calcularValorMateriais(
-        AssistenciaTecnica assistencia) {
+        if (atual == StatusAssistencia.CONCLUIDA
+                || atual == StatusAssistencia.CANCELADA) {
 
-    List<ItemAssistenciaTecnica> itens =
-            itemAssistenciaRepository
-                    .findByAssistenciaId(assistencia.getId());
+            throw new RuntimeException(
+                    "Uma assistência concluída ou cancelada não pode ser alterada."
+            );
+        }
 
-    BigDecimal total = BigDecimal.ZERO;
+        if (novoStatus == StatusAssistencia.EM_ANDAMENTO) {
 
-    for (ItemAssistenciaTecnica item : itens) {
+            if (atual != StatusAssistencia.ABERTA
+                    && atual != StatusAssistencia.AGENDADA) {
 
-        BigDecimal quantidade =
-                BigDecimal.valueOf(item.getQuantidade());
+                throw new RuntimeException(
+                        "Não é possível iniciar a assistência neste status."
+                );
+            }
 
-        BigDecimal valor =
-                item.getMaterial().getValorUnitario();
+            iniciarAtendimento(assistencia);
 
-        total = total.add(quantidade.multiply(valor));
+        } else if (novoStatus == StatusAssistencia.CANCELADA) {
+
+            cancelarAtendimento(assistencia);
+
+        } else if (novoStatus == StatusAssistencia.CONCLUIDA) {
+
+            if (atual != StatusAssistencia.EM_ANDAMENTO) {
+                throw new RuntimeException(
+                        "Só é possível concluir uma assistência em andamento."
+                );
+            }
+
+        } else if (novoStatus == StatusAssistencia.AGENDADA
+                || novoStatus == StatusAssistencia.ABERTA) {
+
+            if (atual != StatusAssistencia.ABERTA
+                    && atual != StatusAssistencia.AGENDADA) {
+
+                throw new RuntimeException(
+                        "Não é possível retornar a assistência para esse status."
+                );
+            }
+
+        } else {
+            throw new RuntimeException("Transição de status inválida.");
+        }
+
+        assistencia.setStatus(novoStatus);
     }
 
-    assistencia.setValorMateriais(total.doubleValue());
+    private void iniciarAtendimento(AssistenciaTecnica assistencia) {
 
-    verificarGarantia(assistencia);
-}
+        List<ItemAssistenciaTecnica> itens =
+                itemAssistenciaRepository.findByAssistenciaId(
+                        assistencia.getId()
+                );
 
-@Transactional
-public void excluirMaterial(
-        Long assistenciaId,
-        Long itemId) {
+        // O consumo de cada reserva e as saídas estão na mesma transação.
+        // Se qualquer material estiver faltando, tudo será revertido.
+        for (ItemAssistenciaTecnica item : itens) {
 
-    AssistenciaTecnica assistencia =
-            assistenciaRepository.findById(assistenciaId)
-                    .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Assistência técnica não encontrada"
-                            )
-                    );
+            reservaMaterialService.consumirReservaAssistencia(
+                    item.getId()
+            );
 
-    ItemAssistenciaTecnica item =
-            itemAssistenciaRepository.findById(itemId)
-                    .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Material da assistência não encontrado"
-                            )
-                    );
-
-    if (!item.getAssistencia().getId()
-            .equals(assistenciaId)) {
-
-        throw new RuntimeException(
-                "O material não pertence a esta assistência"
-        );
+            movimentacaoEstoqueService.salvar(
+                    new MovimentacaoEstoqueRequestDTO(
+                            TipoMovimentacao.SAIDA,
+                            item.getQuantidade(),
+                            item.getMaterial().getId()
+                    )
+            );
+        }
     }
 
-    Material material = item.getMaterial();
+    private void cancelarAtendimento(AssistenciaTecnica assistencia) {
 
-    // Devolve o material ao estoque
-    material.setQuantidade(
-            material.getQuantidade()
-                    + item.getQuantidade()
-    );
+        List<ItemAssistenciaTecnica> itens =
+                itemAssistenciaRepository.findByAssistenciaId(
+                        assistencia.getId()
+                );
 
-    materialRepository.save(material);
+        if (assistencia.getStatus() == StatusAssistencia.EM_ANDAMENTO) {
 
-    // Remove o item da assistência
-    itemAssistenciaRepository.delete(item);
+            // Os materiais já saíram fisicamente.
+            // Devolve cada quantidade por uma movimentação de entrada.
+            for (ItemAssistenciaTecnica item : itens) {
 
-    // Recalcula os valores da assistência
-    calcularValorMateriais(assistencia);
+                movimentacaoEstoqueService.salvar(
+                        new MovimentacaoEstoqueRequestDTO(
+                                TipoMovimentacao.ENTRADA,
+                                item.getQuantidade(),
+                                item.getMaterial().getId()
+                        )
+                );
+            }
 
-    assistenciaRepository.save(assistencia);
-}
+            // As reservas permanecem CONSUMIDAS como histórico.
 
-public List<ItemAssistenciaTecnicaResponseDTO> listarMateriais(
-        Long assistenciaId) {
+        } else {
 
-    AssistenciaTecnica assistencia =
-            assistenciaRepository.findById(assistenciaId)
-                    .orElseThrow(() ->
-                            new RuntimeException(
-                                    "Assistência técnica não encontrada"));
+            // Ainda não houve consumo físico.
+            // Apenas libera as reservas e cancela necessidades pendentes.
+            for (ItemAssistenciaTecnica item : itens) {
 
-    return itemAssistenciaRepository
-            .findByAssistenciaId(assistencia.getId())
-            .stream()
-            .map(item -> new ItemAssistenciaTecnicaResponseDTO(
-                    item.getId(),
-                    item.getQuantidade(),
-                    item.getMaterial().getId(),
-                    item.getMaterial().getNome()
-            ))
-            .toList();
-}
- private void verificarGarantia(
-        AssistenciaTecnica assistencia) {
+                reservaMaterialService.liberarReservaAssistencia(
+                        item.getId()
+                );
+            }
+        }
+    }
 
-    LocalDate limite =
-            assistencia.getDataEntregaOriginal().plusYears(2);
+    private void validarPermissaoAlterarMateriais(
+            AssistenciaTecnica assistencia) {
 
-    boolean dentro =
-            !LocalDate.now().isAfter(limite);
+        if (assistencia.getStatus() != StatusAssistencia.ABERTA
+                && assistencia.getStatus() != StatusAssistencia.AGENDADA) {
 
-    assistencia.setDentroGarantia(dentro);
+            throw new RuntimeException(
+                    "Os materiais só podem ser alterados antes do início da assistência."
+            );
+        }
+    }
 
-    Double materiais = assistencia.getValorMateriais();
+    private AssistenciaTecnica buscarAssistencia(Long id) {
 
-    if (materiais == null) {
-        materiais = 0.0;
+        return assistenciaRepository.findById(id)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Assistência técnica não encontrada"
+                        ));
+    }
+
+    private void validarDataEntrega(LocalDate dataEntregaOriginal) {
+
+        if (dataEntregaOriginal == null) {
+            throw new RuntimeException(
+                    "Informe a data de entrega original do pedido."
+            );
+        }
+    }
+
+    private void calcularValorMateriais(
+            AssistenciaTecnica assistencia) {
+
+        List<ItemAssistenciaTecnica> itens =
+                itemAssistenciaRepository.findByAssistenciaId(
+                        assistencia.getId()
+                );
+
+        BigDecimal total = BigDecimal.ZERO;
+
+        for (ItemAssistenciaTecnica item : itens) {
+
+            BigDecimal quantidade =
+                    BigDecimal.valueOf(item.getQuantidade());
+
+            BigDecimal valor =
+                    item.getMaterial().getValorUnitario();
+
+            if (valor != null) {
+                total = total.add(quantidade.multiply(valor));
+            }
+        }
+
+        assistencia.setValorMateriais(total.doubleValue());
+
+        verificarGarantia(assistencia);
+    }
+
+    private void verificarGarantia(
+            AssistenciaTecnica assistencia) {
+
+        validarDataEntrega(assistencia.getDataEntregaOriginal());
+
+        LocalDate limite =
+                assistencia.getDataEntregaOriginal().plusYears(2);
+
+        boolean dentro =
+                !LocalDate.now().isAfter(limite);
+
+        assistencia.setDentroGarantia(dentro);
+
+        Double materiais = assistencia.getValorMateriais() == null
+                ? 0.0
+                : assistencia.getValorMateriais();
+
+        Double servico = assistencia.getValorServico() == null
+                ? 0.0
+                : assistencia.getValorServico();
+
+        if (dentro) {
+            servico = 0.0;
+        }
+
+        assistencia.setValorServico(servico);
         assistencia.setValorMateriais(materiais);
+        assistencia.setValorTotal(servico + materiais);
     }
 
-    if (dentro) {
+    private ItemAssistenciaTecnicaResponseDTO converterItemParaResponse(
+            ItemAssistenciaTecnica item) {
 
-        assistencia.setValorServico(0.0);
-
-    } else {
-
-        if (assistencia.getValorServico() == null) {
-            assistencia.setValorServico(0.0);
-        }
+        return new ItemAssistenciaTecnicaResponseDTO(
+                item.getId(),
+                item.getQuantidade(),
+                item.getMaterial().getId(),
+                item.getMaterial().getNome()
+        );
     }
-
-    assistencia.setValorTotal(
-            assistencia.getValorServico() + materiais
-    );
-}
 
     private AssistenciaTecnicaResponseDTO converterParaResponse(
             AssistenciaTecnica assistencia) {
@@ -382,8 +535,8 @@ public List<ItemAssistenciaTecnicaResponseDTO> listarMateriais(
                 assistencia.getStatus(),
                 assistencia.getCliente().getId(),
                 assistencia.getPedido() != null
-                ? assistencia.getPedido().getId()
-                : null,
+                        ? assistencia.getPedido().getId()
+                        : null,
                 assistencia.getFuncionario().getId()
         );
     }
