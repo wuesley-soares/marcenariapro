@@ -218,6 +218,7 @@ public AssistenciaTecnicaService(
         item.setQuantidade(dto.quantidade());
         item.setAssistencia(assistencia);
         item.setMaterial(material);
+        item.setValorUnitario(material.getValorUnitario());
 
         ItemAssistenciaTecnica salvo =
                 itemAssistenciaRepository.save(item);
@@ -464,9 +465,9 @@ public AssistenciaTecnicaService(
 
             BigDecimal quantidade =
                     BigDecimal.valueOf(item.getQuantidade());
-
-            BigDecimal valor =
-                    item.getMaterial().getValorUnitario();
+BigDecimal valor = item.getValorUnitario() != null
+        ? item.getValorUnitario()
+        : BigDecimal.ZERO;
 
             if (valor != null) {
                 total = total.add(quantidade.multiply(valor));

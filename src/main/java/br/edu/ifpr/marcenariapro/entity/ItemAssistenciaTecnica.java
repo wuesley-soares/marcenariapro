@@ -1,3 +1,4 @@
+
 package br.edu.ifpr.marcenariapro.entity;
 
 import jakarta.persistence.Entity;
@@ -7,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "itens_assistencia_tecnica")
@@ -16,7 +18,9 @@ public class ItemAssistenciaTecnica {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-private Integer quantidade;
+    private Integer quantidade;
+
+    private BigDecimal valorUnitario;
 
     @ManyToOne
     @JoinColumn(name = "assistencia_id")
@@ -29,13 +33,22 @@ private Integer quantidade;
     public Long getId() {
         return id;
     }
+
     public Integer getQuantidade() {
-    return quantidade;
+        return quantidade;
     }
 
     public void setQuantidade(Integer quantidade) {
-    this.quantidade = quantidade;
+        this.quantidade = quantidade;
     }
+
+        public BigDecimal getValorUnitario() {
+            return valorUnitario;
+        }
+
+        public void setValorUnitario(BigDecimal valorUnitario) {
+            this.valorUnitario = valorUnitario;
+        }
 
     public AssistenciaTecnica getAssistencia() {
         return assistencia;
