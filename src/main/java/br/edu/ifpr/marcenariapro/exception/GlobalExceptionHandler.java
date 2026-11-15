@@ -6,6 +6,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -31,7 +32,10 @@ public class GlobalExceptionHandler {
             erros.put(erro.getField(), erro.getDefaultMessage());
         }
 
-        resposta.put("message", "Existem campos inválidos. Verifique os dados informados.");
+        resposta.put(
+                "message",
+                "Existem campos inválidos. Verifique os dados informados."
+        );
         resposta.put("erros", erros);
 
         return ResponseEntity.badRequest().body(resposta);
@@ -52,6 +56,24 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(ex.getStatusCode())
+                .body(resposta);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Map<String, String>> tratarViolacaoIntegridade(
+            DataIntegrityViolationException ex) {
+
+        log.warn("Violação de integridade no banco de dados: {}", ex.getMessage());
+
+        Map<String, String> resposta = new HashMap<>();
+
+        resposta.put(
+                "message",
+                "A operação não pôde ser concluída. Já existe um registro com esses dados ou há um vínculo que impede esta operação."
+        );
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
                 .body(resposta);
     }
 

@@ -18,6 +18,8 @@ import br.edu.ifpr.marcenariapro.enums.StatusReservaMaterial;
 import br.edu.ifpr.marcenariapro.repository.ItemProducaoRepository;
 import br.edu.ifpr.marcenariapro.repository.NecessidadeCompraRepository;
 import br.edu.ifpr.marcenariapro.repository.ReservaMaterialRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 @Service
 public class ReservaMaterialService {
@@ -329,39 +331,53 @@ if (necessidadeCompleta) {
     }
 
     @Transactional
-    public void consumirReservaProducao(Long itemProducaoId) {
+public void consumirReservaProducao(Long itemProducaoId) {
 
-        ReservaMaterial reserva = reservaRepository
-                .findByItemProducaoId(itemProducaoId)
-                .orElseThrow(() -> new RuntimeException(
-                        "Reserva não encontrada para um dos materiais da produção."
-                ));
+    ReservaMaterial reserva = reservaRepository
+            .findByItemProducaoId(itemProducaoId)
+            .orElseThrow(() -> new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Reserva não encontrada para um dos materiais da produção."
+            ));
 
-        if (reserva.getStatus() != StatusReservaMaterial.ATIVA) {
-            throw new RuntimeException(
-                    "A reserva do material não está ativa."
-            );
-        }
-
-        if (reserva.getQuantidadeReservada()
-                .compareTo(reserva.getQuantidadeSolicitada()) < 0) {
-
-            throw new RuntimeException(
-                    "Ainda não há quantidade suficiente reservada para o material: "
-                            + reserva.getMaterial().getNome()
-            );
-        }
-
-        reserva.setQuantidadeConsumida(reserva.getQuantidadeSolicitada());
-        reserva.setStatus(StatusReservaMaterial.CONSUMIDA);
-
-        reservaRepository.save(reserva);
+    if (reserva.getStatus() != StatusReservaMaterial.ATIVA) {
+        throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "A reserva do material "
+                        + reserva.getMaterial().getNome()
+                        + " não está ativa."
+        );
     }
 
+    if (reserva.getQuantidadeReservada()
+            .compareTo(reserva.getQuantidadeSolicitada()) < 0) {
+
+        BigDecimal faltante = reserva.getQuantidadeSolicitada()
+                .subtract(reserva.getQuantidadeReservada());
+
+        throw new ResponseStatusException(
+                HttpStatus.CONFLICT,
+                "Ainda faltam "
+                        + faltante.stripTrailingZeros().toPlainString()
+                        + " unidades do material "
+                        + reserva.getMaterial().getNome()
+                        + " para iniciar a produção."
+        );
+    }
+
+    reserva.setQuantidadeConsumida(
+            reserva.getQuantidadeSolicitada()
+    );
+
+    reserva.setStatus(StatusReservaMaterial.CONSUMIDA);
+
+    reservaRepository.save(reserva);
+}
     private void liberarReserva(ReservaMaterial reserva) {
 
         if (reserva.getStatus() == StatusReservaMaterial.CONSUMIDA) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Não é possível liberar uma reserva já consumida."
             );
         }

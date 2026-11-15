@@ -4,7 +4,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.transaction.annotation.Transactional;
 
 import br.edu.ifpr.marcenariapro.dto.MovimentacaoEstoqueRequestDTO;
@@ -60,23 +62,27 @@ public class ProducaoService {
 
         Pedido pedido = pedidoRepository.findById(dto.pedidoId())
                 .orElseThrow(() ->
-                        new RuntimeException("Pedido não encontrado"));
+                        new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "Pedido não encontrado"));
 
         if (pedido.getStatus() != StatusPedido.APROVADO) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Não é possível criar a produção. "
                     + "O pedido precisa estar aprovado."
             );
         }
 
         if (producaoRepository.existsByPedidoId(dto.pedidoId())) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Este pedido já possui uma produção."
             );
         }
 
         if (dto.status() != StatusProducao.AGUARDANDO) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Uma nova produção deve iniciar com o status AGUARDANDO."
             );
         }
@@ -133,7 +139,8 @@ public class ProducaoService {
 
         Producao producao = producaoRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Produção não encontrada"));
+                        new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "Produção não encontrada"));
 
         return converterParaResponse(producao);
     }
@@ -144,7 +151,8 @@ public class ProducaoService {
 
         Producao producao = producaoRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Produção não encontrada"));
+                        new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "Produção não encontrada"));
 
         Pedido pedido = producao.getPedido();
 
@@ -156,7 +164,8 @@ public class ProducaoService {
         if (statusAtual == StatusProducao.ENTREGUE
                 && novoStatus != StatusProducao.ENTREGUE) {
 
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Não é possível alterar uma produção que já foi entregue."
             );
         }
@@ -164,7 +173,8 @@ public class ProducaoService {
         if (statusAtual == StatusProducao.CANCELADO
                 && novoStatus != StatusProducao.CANCELADO) {
 
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Não é possível alterar uma produção que já foi cancelada."
             );
         }
@@ -177,7 +187,8 @@ public class ProducaoService {
             if (statusAtual == StatusProducao.PRONTO
                     || statusAtual == StatusProducao.ENTREGUE) {
 
-                throw new RuntimeException(
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                         "Não é possível cancelar uma produção pronta ou entregue."
                 );
             }
@@ -238,11 +249,25 @@ public class ProducaoService {
                 if (item.getStatus()
                         != StatusItemProducao.LIBERADO) {
 
-                    throw new RuntimeException(
-                            "Não é possível iniciar a produção. "
-                            + "O material "
-                            + item.getMaterial().getNome()
-                            + " ainda não está totalmente disponível."
+                    BigDecimal faltante =
+                            reservaMaterialService.calcularQuantidadeFaltante(
+                                    item.getId());
+
+                    String detalhe;
+
+                    if (faltante.compareTo(BigDecimal.ZERO) > 0) {
+                        detalhe = "faltam "
+                                + faltante.stripTrailingZeros().toPlainString()
+                                + " unidade(s)";
+                    } else {
+                        detalhe = "a reserva ainda não foi liberada";
+                    }
+
+                    throw new ResponseStatusException(
+                            HttpStatus.CONFLICT,
+                            "Não foi possível iniciar a produção. Material "
+                                    + item.getMaterial().getNome()
+                                    + ": " + detalhe + "."
                     );
                 }
 
@@ -266,7 +291,8 @@ public class ProducaoService {
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
             if (valorPago.compareTo(valorMinimoEntrada) < 0) {
-                throw new RuntimeException(
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                         "Não é possível iniciar a produção. "
                         + "O pedido precisa ter pelo menos 30% do valor pago."
                 );
@@ -316,7 +342,8 @@ public class ProducaoService {
         if (novoStatus == StatusProducao.ENTREGUE) {
 
             if (statusAtual != StatusProducao.PRONTO) {
-                throw new RuntimeException(
+                throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                         "Não é possível entregar a produção. "
                         + "A produção precisa estar pronta."
                 );
@@ -339,10 +366,12 @@ public class ProducaoService {
 
         Producao producao = producaoRepository.findById(id)
                 .orElseThrow(() ->
-                        new RuntimeException("Produção não encontrada"));
+                        new ResponseStatusException(
+                    HttpStatus.NOT_FOUND, "Produção não encontrada"));
 
         if (producao.getStatus() != StatusProducao.AGUARDANDO) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Só é possível excluir uma produção que ainda está aguardando."
             );
         }
@@ -368,7 +397,8 @@ public class ProducaoService {
         if (quantidade == null
                 || quantidade.compareTo(BigDecimal.ZERO) <= 0) {
 
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
                     "A quantidade do material precisa ser maior que zero."
             );
         }
@@ -376,7 +406,8 @@ public class ProducaoService {
         try {
             quantidade.setScale(0, RoundingMode.UNNECESSARY);
         } catch (ArithmeticException e) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
                     "A quantidade do material precisa ser inteira, "
                     + "pois o controle atual do estoque utiliza unidades inteiras."
             );
@@ -406,7 +437,8 @@ public class ProducaoService {
             StatusProducao novoStatus) {
 
         if (novoStatus == null) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
                     "Informe o status da produção."
             );
         }
@@ -432,7 +464,8 @@ public class ProducaoService {
         };
 
         if (!transicaoPermitida) {
-            throw new RuntimeException(
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
                     "Transição de status inválida. "
                     + "Verifique a sequência permitida para a produção."
             );
