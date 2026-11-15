@@ -1,6 +1,7 @@
 package br.edu.ifpr.marcenariapro.service;
 
 import java.math.BigDecimal;
+import java.util.Comparator;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
@@ -11,28 +12,28 @@ import br.edu.ifpr.marcenariapro.entity.ItemProducao;
 import br.edu.ifpr.marcenariapro.entity.Material;
 import br.edu.ifpr.marcenariapro.entity.NecessidadeCompra;
 import br.edu.ifpr.marcenariapro.entity.ReservaMaterial;
+import br.edu.ifpr.marcenariapro.enums.StatusItemProducao;
 import br.edu.ifpr.marcenariapro.enums.StatusNecessidadeCompra;
 import br.edu.ifpr.marcenariapro.enums.StatusReservaMaterial;
+import br.edu.ifpr.marcenariapro.repository.ItemProducaoRepository;
 import br.edu.ifpr.marcenariapro.repository.NecessidadeCompraRepository;
 import br.edu.ifpr.marcenariapro.repository.ReservaMaterialRepository;
-import br.edu.ifpr.marcenariapro.repository.MaterialRepository;
-
 
 @Service
 public class ReservaMaterialService {
 
     private final ReservaMaterialRepository reservaRepository;
     private final NecessidadeCompraRepository necessidadeRepository;
-    private final MaterialRepository materialRepository;
+    private final ItemProducaoRepository itemProducaoRepository;
 
     public ReservaMaterialService(
             ReservaMaterialRepository reservaRepository,
             NecessidadeCompraRepository necessidadeRepository,
-            MaterialRepository materialRepository) {
+            ItemProducaoRepository itemProducaoRepository) {
 
         this.reservaRepository = reservaRepository;
         this.necessidadeRepository = necessidadeRepository;
-        this.materialRepository = materialRepository;
+        this.itemProducaoRepository = itemProducaoRepository;
     }
 
     @Transactional
@@ -124,10 +125,8 @@ public class ReservaMaterialService {
                 .map(ReservaMaterial::getQuantidadeReservada)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        BigDecimal disponivel =
-                estoqueFisico.subtract(totalReservado);
-
-        return disponivel.max(BigDecimal.ZERO);
+        return estoqueFisico.subtract(totalReservado)
+                .max(BigDecimal.ZERO);
     }
 
     private void criarNecessidadeCompra(
@@ -147,182 +146,212 @@ public class ReservaMaterialService {
 
         necessidadeRepository.save(necessidade);
     }
-    
-@Transactional
-public void atenderNecessidadesCompra(
-        Material material,
-        BigDecimal quantidadeRecebida) {
 
-    if (quantidadeRecebida == null
-            || quantidadeRecebida.compareTo(BigDecimal.ZERO) <= 0) {
-        return;
+    /**
+     * Verifica se a reserva do item de produção está completa.
+     */
+    public boolean estaTotalmenteReservado(Long itemProducaoId) {
+
+        ReservaMaterial reserva = reservaRepository
+                .findByItemProducaoId(itemProducaoId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Reserva não encontrada para o item de produção."
+                ));
+
+        return reserva.getQuantidadeReservada()
+                .compareTo(reserva.getQuantidadeSolicitada()) >= 0;
     }
 
-    List<NecessidadeCompra> necessidades =
-            necessidadeRepository.findByMaterialIdAndStatusIn(
-                    material.getId(),
-                    List.of(
-                            StatusNecessidadeCompra.ABERTA,
-                            StatusNecessidadeCompra.PARCIAL
-                    )
+    /**
+     * Distribui a quantidade recebida entre as necessidades abertas
+     * do material, priorizando as mais antigas.
+     */
+    @Transactional
+    public void atenderNecessidadesCompra(
+            Material material,
+            BigDecimal quantidadeRecebida) {
+
+        if (quantidadeRecebida == null
+                || quantidadeRecebida.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        List<NecessidadeCompra> necessidades =
+                necessidadeRepository.findByMaterialIdAndStatus(
+                        material.getId(),
+                        StatusNecessidadeCompra.ABERTA
+                );
+
+        necessidades.sort(
+                Comparator.comparing(NecessidadeCompra::getDataCriacao)
+        );
+
+        BigDecimal restante = quantidadeRecebida;
+
+        for (NecessidadeCompra necessidade : necessidades) {
+
+            if (restante.compareTo(BigDecimal.ZERO) <= 0) {
+                break;
+            }
+
+            ReservaMaterial reserva =
+                    buscarReservaDaNecessidade(necessidade);
+
+            if (reserva.getStatus() != StatusReservaMaterial.ATIVA) {
+                continue;
+            }
+
+            BigDecimal faltaNecessidade =
+                    necessidade.getQuantidadeNecessaria()
+                            .subtract(necessidade.getQuantidadeAtendida());
+
+            BigDecimal capacidadeReserva =
+                    reserva.getQuantidadeSolicitada()
+                            .subtract(reserva.getQuantidadeReservada());
+
+            BigDecimal quantidadeAtender = restante
+                    .min(faltaNecessidade)
+                    .min(capacidadeReserva);
+
+            if (quantidadeAtender.compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
+            }
+
+            reserva.setQuantidadeReservada(
+                    reserva.getQuantidadeReservada().add(quantidadeAtender)
             );
 
-    necessidades.sort(
-            java.util.Comparator.comparing(
-                    NecessidadeCompra::getDataCriacao
-            )
-    );
+            necessidade.setQuantidadeAtendida(
+                    necessidade.getQuantidadeAtendida()
+                            .add(quantidadeAtender)
+            );
 
-    BigDecimal restante = quantidadeRecebida;
+            boolean necessidadeCompleta =
+                    necessidade.getQuantidadeAtendida()
+                            .compareTo(necessidade.getQuantidadeNecessaria()) >= 0;
 
-    for (NecessidadeCompra necessidade : necessidades) {
+            if (necessidadeCompleta) {
+                necessidade.setStatus(StatusNecessidadeCompra.ATENDIDA);
+            }
 
-        if (restante.compareTo(BigDecimal.ZERO) <= 0) {
-            break;
+            reservaRepository.save(reserva);
+            necessidadeRepository.save(necessidade);
+
+            /*
+             * Quando a reserva do item de produção estiver completa,
+             * libera o item para iniciar a produção.
+             */
+            if (necessidadeCompleta
+                    && necessidade.getItemProducao() != null) {
+
+                ItemProducao item = necessidade.getItemProducao();
+
+                if (reserva.getQuantidadeReservada()
+                        .compareTo(reserva.getQuantidadeSolicitada()) >= 0) {
+
+                    item.setStatus(StatusItemProducao.LIBERADO);
+                    itemProducaoRepository.save(item);
+                }
+            }
+
+            restante = restante.subtract(quantidadeAtender);
+        }
+    }
+
+    private ReservaMaterial buscarReservaDaNecessidade(
+            NecessidadeCompra necessidade) {
+
+        if (necessidade.getItemProducao() != null) {
+
+            return reservaRepository.findByItemProducaoId(
+                    necessidade.getItemProducao().getId()
+            ).orElseThrow(() -> new RuntimeException(
+                    "Reserva não encontrada para a necessidade de compra."
+            ));
         }
 
-        ReservaMaterial reserva = buscarReservaDaNecessidade(necessidade);
+        if (necessidade.getItemAssistenciaTecnica() != null) {
 
-        if (reserva.getStatus() != StatusReservaMaterial.ATIVA) {
-            continue;
+            return reservaRepository.findByItemAssistenciaTecnicaId(
+                    necessidade.getItemAssistenciaTecnica().getId()
+            ).orElseThrow(() -> new RuntimeException(
+                    "Reserva não encontrada para a necessidade de compra."
+            ));
         }
 
-        BigDecimal faltaNecessidade =
-                necessidade.getQuantidadeNecessaria()
-                        .subtract(necessidade.getQuantidadeAtendida());
-
-        BigDecimal capacidadeReserva =
-                reserva.getQuantidadeSolicitada()
-                        .subtract(reserva.getQuantidadeReservada());
-
-        BigDecimal quantidadeAtender = restante
-                .min(faltaNecessidade)
-                .min(capacidadeReserva);
-
-        if (quantidadeAtender.compareTo(BigDecimal.ZERO) <= 0) {
-            continue;
-        }
-
-        reserva.setQuantidadeReservada(
-                reserva.getQuantidadeReservada().add(quantidadeAtender)
+        throw new RuntimeException(
+                "Necessidade de compra sem item de produção ou assistência."
         );
-
-        necessidade.setQuantidadeAtendida(
-                necessidade.getQuantidadeAtendida().add(quantidadeAtender)
-        );
-
-        if (necessidade.getQuantidadeAtendida()
-                .compareTo(necessidade.getQuantidadeNecessaria()) >= 0) {
-
-            necessidade.setStatus(StatusNecessidadeCompra.ATENDIDA);
-
-        } else {
-
-            necessidade.setStatus(StatusNecessidadeCompra.PARCIAL);
-        }
-
-        reservaRepository.save(reserva);
-        necessidadeRepository.save(necessidade);
-
-        restante = restante.subtract(quantidadeAtender);
     }
-}
-
-private ReservaMaterial buscarReservaDaNecessidade(
-        NecessidadeCompra necessidade) {
-
-    if (necessidade.getItemProducao() != null) {
-
-        return reservaRepository.findByItemProducaoId(
-                necessidade.getItemProducao().getId()
-        ).orElseThrow(() -> new IllegalStateException(
-                "Reserva não encontrada para a necessidade de compra."
-        ));
-    }
-
-    if (necessidade.getItemAssistenciaTecnica() != null) {
-
-        return reservaRepository.findByItemAssistenciaTecnicaId(
-                necessidade.getItemAssistenciaTecnica().getId()
-        ).orElseThrow(() -> new IllegalStateException(
-                "Reserva não encontrada para a necessidade de compra."
-        ));
-    }
-
-    throw new IllegalStateException(
-            "Necessidade de compra sem item de produção ou assistência."
-    );
-}
-
 
     @Transactional
     public void liberarReservaProducao(Long itemProducaoId) {
 
         reservaRepository.findByItemProducaoId(itemProducaoId)
-                .ifPresent(reserva -> liberarReserva(reserva));
+                .ifPresent(this::liberarReserva);
 
         necessidadeRepository.findByItemProducaoId(itemProducaoId)
-                .ifPresent(necessidade ->
-                        necessidade.setStatus(
-                                StatusNecessidadeCompra.CANCELADA
-                        ));
+                .ifPresent(necessidade -> {
+                    necessidade.setStatus(StatusNecessidadeCompra.CANCELADA);
+                    necessidadeRepository.save(necessidade);
+                });
     }
 
     @Transactional
     public void liberarReservaAssistencia(Long itemAssistenciaId) {
 
         reservaRepository.findByItemAssistenciaTecnicaId(itemAssistenciaId)
-                .ifPresent(reserva -> liberarReserva(reserva));
+                .ifPresent(this::liberarReserva);
 
         necessidadeRepository.findByItemAssistenciaTecnicaId(
                 itemAssistenciaId
-        ).ifPresent(necessidade ->
-                necessidade.setStatus(
-                        StatusNecessidadeCompra.CANCELADA
-                ));
+        ).ifPresent(necessidade -> {
+            necessidade.setStatus(StatusNecessidadeCompra.CANCELADA);
+            necessidadeRepository.save(necessidade);
+        });
     }
 
     @Transactional
-public void removerReservaProducao(Long itemProducaoId) {
+    public void removerReservaProducao(Long itemProducaoId) {
 
-    necessidadeRepository.findByItemProducaoId(itemProducaoId)
-            .ifPresent(necessidade ->
-                    necessidadeRepository.delete(necessidade));
+        necessidadeRepository.findByItemProducaoId(itemProducaoId)
+                .ifPresent(necessidade ->
+                        necessidadeRepository.delete(necessidade));
 
-    reservaRepository.findByItemProducaoId(itemProducaoId)
-            .ifPresent(reserva ->
-                    reservaRepository.delete(reserva));
-}
-
-        @Transactional
-public void consumirReservaProducao(Long itemProducaoId) {
-
-    ReservaMaterial reserva = reservaRepository
-            .findByItemProducaoId(itemProducaoId)
-            .orElseThrow(() -> new RuntimeException(
-                    "Reserva não encontrada para um dos materiais da produção."
-            ));
-
-    if (reserva.getStatus() != StatusReservaMaterial.ATIVA) {
-        throw new RuntimeException(
-                "A reserva do material não está ativa."
-        );
+        reservaRepository.findByItemProducaoId(itemProducaoId)
+                .ifPresent(reserva ->
+                        reservaRepository.delete(reserva));
     }
 
-    if (reserva.getQuantidadeReservada()
-            .compareTo(reserva.getQuantidadeSolicitada()) < 0) {
+    @Transactional
+    public void consumirReservaProducao(Long itemProducaoId) {
 
-        throw new RuntimeException(
-                "Ainda não há quantidade suficiente reservada para o material: "
-                        + reserva.getMaterial().getNome()
-        );
+        ReservaMaterial reserva = reservaRepository
+                .findByItemProducaoId(itemProducaoId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Reserva não encontrada para um dos materiais da produção."
+                ));
+
+        if (reserva.getStatus() != StatusReservaMaterial.ATIVA) {
+            throw new RuntimeException(
+                    "A reserva do material não está ativa."
+            );
+        }
+
+        if (reserva.getQuantidadeReservada()
+                .compareTo(reserva.getQuantidadeSolicitada()) < 0) {
+
+            throw new RuntimeException(
+                    "Ainda não há quantidade suficiente reservada para o material: "
+                            + reserva.getMaterial().getNome()
+            );
+        }
+
+        reserva.setQuantidadeConsumida(reserva.getQuantidadeSolicitada());
+        reserva.setStatus(StatusReservaMaterial.CONSUMIDA);
+
+        reservaRepository.save(reserva);
     }
-
-    reserva.setQuantidadeConsumida(reserva.getQuantidadeSolicitada());
-    reserva.setStatus(StatusReservaMaterial.CONSUMIDA);
-
-    reservaRepository.save(reserva);
-}
 
     private void liberarReserva(ReservaMaterial reserva) {
 
@@ -339,49 +368,47 @@ public void consumirReservaProducao(Long itemProducaoId) {
     }
 
     @Transactional
-public void consumirReservaAssistencia(Long itemAssistenciaId) {
+    public void consumirReservaAssistencia(Long itemAssistenciaId) {
 
-    ReservaMaterial reserva = reservaRepository
-            .findByItemAssistenciaTecnicaId(itemAssistenciaId)
-            .orElseThrow(() -> new RuntimeException(
-                    "Reserva não encontrada para o material da assistência técnica."
-            ));
+        ReservaMaterial reserva = reservaRepository
+                .findByItemAssistenciaTecnicaId(itemAssistenciaId)
+                .orElseThrow(() -> new RuntimeException(
+                        "Reserva não encontrada para o material da assistência técnica."
+                ));
 
-    if (reserva.getStatus() != StatusReservaMaterial.ATIVA) {
-        throw new RuntimeException(
-                "A reserva do material da assistência não está ativa."
+        if (reserva.getStatus() != StatusReservaMaterial.ATIVA) {
+            throw new RuntimeException(
+                    "A reserva do material da assistência não está ativa."
+            );
+        }
+
+        if (reserva.getQuantidadeReservada()
+                .compareTo(reserva.getQuantidadeSolicitada()) < 0) {
+
+            throw new RuntimeException(
+                    "Ainda não há quantidade suficiente reservada para o material: "
+                            + reserva.getMaterial().getNome()
+            );
+        }
+
+        reserva.setQuantidadeConsumida(
+                reserva.getQuantidadeSolicitada()
         );
+
+        reserva.setStatus(StatusReservaMaterial.CONSUMIDA);
+
+        reservaRepository.save(reserva);
     }
 
-    if (reserva.getQuantidadeReservada()
-            .compareTo(reserva.getQuantidadeSolicitada()) < 0) {
+    @Transactional
+    public void removerReservaAssistencia(Long itemAssistenciaId) {
 
-        throw new RuntimeException(
-                "Ainda não há quantidade suficiente reservada para o material: "
-                        + reserva.getMaterial().getNome()
-        );
+        necessidadeRepository.findByItemAssistenciaTecnicaId(itemAssistenciaId)
+                .ifPresent(necessidade ->
+                        necessidadeRepository.delete(necessidade));
+
+        reservaRepository.findByItemAssistenciaTecnicaId(itemAssistenciaId)
+                .ifPresent(reserva ->
+                        reservaRepository.delete(reserva));
     }
-
-    reserva.setQuantidadeConsumida(
-            reserva.getQuantidadeSolicitada()
-    );
-
-    reserva.setStatus(StatusReservaMaterial.CONSUMIDA);
-
-    reservaRepository.save(reserva);
-}
-
-@Transactional
-public void removerReservaAssistencia(Long itemAssistenciaId) {
-
-    necessidadeRepository.findByItemAssistenciaTecnicaId(itemAssistenciaId)
-            .ifPresent(necessidade ->
-                    necessidadeRepository.delete(necessidade));
-
-    reservaRepository.findByItemAssistenciaTecnicaId(itemAssistenciaId)
-            .ifPresent(reserva ->
-                    reservaRepository.delete(reserva));
-}
-
-
 }

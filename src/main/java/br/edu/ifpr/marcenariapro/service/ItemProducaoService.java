@@ -12,6 +12,7 @@ import br.edu.ifpr.marcenariapro.dto.MovimentacaoEstoqueRequestDTO;
 import br.edu.ifpr.marcenariapro.entity.ItemProducao;
 import br.edu.ifpr.marcenariapro.entity.Material;
 import br.edu.ifpr.marcenariapro.entity.Producao;
+import br.edu.ifpr.marcenariapro.enums.StatusItemProducao;
 import br.edu.ifpr.marcenariapro.enums.StatusProducao;
 import br.edu.ifpr.marcenariapro.enums.TipoMovimentacao;
 import br.edu.ifpr.marcenariapro.repository.ItemProducaoRepository;
@@ -25,20 +26,22 @@ public class ItemProducaoService {
     private final MaterialRepository materialRepository;
     private final ProducaoRepository producaoRepository;
     private final MovimentacaoEstoqueService movimentacaoEstoqueService;
+    private final ReservaMaterialService reservaMaterialService;
 
     public ItemProducaoService(
             ItemProducaoRepository itemProducaoRepository,
             MaterialRepository materialRepository,
             ProducaoRepository producaoRepository,
-            MovimentacaoEstoqueService movimentacaoEstoqueService) {
+            MovimentacaoEstoqueService movimentacaoEstoqueService,
+            ReservaMaterialService reservaMaterialService) {
 
         this.itemProducaoRepository = itemProducaoRepository;
         this.materialRepository = materialRepository;
         this.producaoRepository = producaoRepository;
         this.movimentacaoEstoqueService = movimentacaoEstoqueService;
+        this.reservaMaterialService = reservaMaterialService;
     }
 
-    // ADICIONAR MATERIAL
     @Transactional
     public ItemProducaoResponseDTO salvar(
             Long producaoId,
@@ -52,38 +55,14 @@ public class ItemProducaoService {
                 .orElseThrow(() ->
                         new RuntimeException("Material não encontrado"));
 
-        if (dto.quantidade() == null
-        || dto.quantidade().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new RuntimeException(
-                    "A quantidade deve ser maior que zero");
-        }
+        validarQuantidade(dto.quantidade());
 
-        /*
-         * Só permite adicionar materiais enquanto
-         * a produção estiver aguardando ou em produção.
-         */
         if (producao.getStatus() != StatusProducao.AGUARDANDO
                 && producao.getStatus() != StatusProducao.EM_PRODUCAO) {
 
             throw new RuntimeException(
-                    "Não é possível adicionar materiais nesta produção");
-        }
-
-        /*
-         * Se a produção já estiver em andamento,
-         * o material precisa ser retirado do estoque
-         * imediatamente.
-         */
-        if (producao.getStatus() == StatusProducao.EM_PRODUCAO) {
-
-            MovimentacaoEstoqueRequestDTO movimentacao =
-                    new MovimentacaoEstoqueRequestDTO(
-                            TipoMovimentacao.SAIDA,
-                           dto.quantidade().intValue(),
-                            material.getId()
-                    );
-
-            movimentacaoEstoqueService.salvar(movimentacao);
+                    "Não é possível adicionar materiais nesta produção."
+            );
         }
 
         ItemProducao item = new ItemProducao();
@@ -92,68 +71,113 @@ public class ItemProducaoService {
         item.setProducao(producao);
         item.setMaterial(material);
 
+        if (producao.getStatus() == StatusProducao.AGUARDANDO) {
+
+            item.setStatus(StatusItemProducao.AGUARDANDO_MATERIAL);
+
+            ItemProducao salvo = itemProducaoRepository.save(item);
+
+            reservaMaterialService.reservarItemProducao(salvo);
+
+            if (reservaMaterialService.estaTotalmenteReservado(salvo.getId())) {
+                salvo.setStatus(StatusItemProducao.LIBERADO);
+            }
+
+            return converterParaResponse(
+                    itemProducaoRepository.save(salvo)
+            );
+        }
+
+        /*
+         * Se a produção já estiver em andamento,
+         * registra a saída do material imediatamente.
+         */
+        MovimentacaoEstoqueRequestDTO movimentacao =
+                new MovimentacaoEstoqueRequestDTO(
+                        TipoMovimentacao.SAIDA,
+                        dto.quantidade().intValueExact(),
+                        material.getId()
+                );
+
+        movimentacaoEstoqueService.salvar(movimentacao);
+
+        item.setStatus(StatusItemProducao.EM_PRODUCAO);
+
         ItemProducao salvo = itemProducaoRepository.save(item);
 
-        return new ItemProducaoResponseDTO(
-                salvo.getId(),
-                salvo.getQuantidade(),
-                salvo.getMaterial().getId(),
-                salvo.getMaterial().getNome()
-        );
+        return converterParaResponse(salvo);
     }
 
-    // LISTAR MATERIAIS
     public List<ItemProducaoResponseDTO> listarPorProducao(
             Long producaoId) {
 
         if (!producaoRepository.existsById(producaoId)) {
-            throw new RuntimeException(
-                    "Produção não encontrada");
+            throw new RuntimeException("Produção não encontrada");
         }
 
-        return itemProducaoRepository
-                .findByProducaoId(producaoId)
+        return itemProducaoRepository.findByProducaoId(producaoId)
                 .stream()
-                .map(item ->
-                        new ItemProducaoResponseDTO(
-                                item.getId(),
-                                item.getQuantidade(),
-                                item.getMaterial().getId(),
-                                item.getMaterial().getNome()
-                        ))
+                .map(this::converterParaResponse)
                 .toList();
     }
 
-    // REMOVER MATERIAL
-    public void excluir(
-            Long producaoId,
-            Long itemId) {
+    @Transactional
+    public void excluir(Long producaoId, Long itemId) {
 
         Producao producao = producaoRepository.findById(producaoId)
                 .orElseThrow(() ->
-                        new RuntimeException(
-                                "Produção não encontrada"));
+                        new RuntimeException("Produção não encontrada"));
 
         ItemProducao item = itemProducaoRepository.findById(itemId)
                 .orElseThrow(() ->
-                        new RuntimeException(
-                                "Item de produção não encontrado"));
+                        new RuntimeException("Item de produção não encontrado"));
 
-        // Verifica se o item pertence à produção
         if (!item.getProducao().getId().equals(producao.getId())) {
             throw new RuntimeException(
-                    "O material não pertence a esta produção");
+                    "O material não pertence a esta produção."
+            );
         }
 
-        /*
-         * Só permite remover enquanto a produção
-         * estiver aguardando.
-         */
         if (producao.getStatus() != StatusProducao.AGUARDANDO) {
             throw new RuntimeException(
-                    "Só é possível remover materiais enquanto a produção estiver aguardando");
+                    "Só é possível remover materiais enquanto a produção estiver aguardando."
+            );
         }
 
+        reservaMaterialService.removerReservaProducao(item.getId());
+
         itemProducaoRepository.delete(item);
+    }
+
+    private void validarQuantidade(BigDecimal quantidade) {
+
+        if (quantidade == null
+                || quantidade.compareTo(BigDecimal.ZERO) <= 0) {
+
+            throw new RuntimeException(
+                    "A quantidade deve ser maior que zero."
+            );
+        }
+
+        try {
+            quantidade.intValueExact();
+        } catch (ArithmeticException e) {
+            throw new RuntimeException(
+                    "A quantidade deve ser inteira, pois o estoque atual "
+                    + "trabalha com unidades inteiras."
+            );
+        }
+    }
+
+    private ItemProducaoResponseDTO converterParaResponse(
+            ItemProducao item) {
+
+        return new ItemProducaoResponseDTO(
+                item.getId(),
+                item.getQuantidade(),
+                item.getMaterial().getId(),
+                item.getMaterial().getNome(),
+                item.getStatus()
+        );
     }
 }

@@ -1,4 +1,3 @@
-
 package br.edu.ifpr.marcenariapro.service;
 
 import java.math.BigDecimal;
@@ -16,6 +15,8 @@ import br.edu.ifpr.marcenariapro.entity.ItemProducao;
 import br.edu.ifpr.marcenariapro.entity.Pagamento;
 import br.edu.ifpr.marcenariapro.entity.Pedido;
 import br.edu.ifpr.marcenariapro.entity.Producao;
+import br.edu.ifpr.marcenariapro.enums.StatusItemProducao;
+import br.edu.ifpr.marcenariapro.enums.StatusPagamento;
 import br.edu.ifpr.marcenariapro.enums.StatusPedido;
 import br.edu.ifpr.marcenariapro.enums.StatusProducao;
 import br.edu.ifpr.marcenariapro.enums.TipoMovimentacao;
@@ -100,12 +101,21 @@ public class ProducaoService {
             itemProducao.setQuantidade(itemOrcamento.getQuantidade());
             itemProducao.setMaterial(itemOrcamento.getMaterial());
             itemProducao.setProducao(producaoSalva);
+            itemProducao.setStatus(
+                    StatusItemProducao.AGUARDANDO_MATERIAL
+            );
 
             ItemProducao itemSalvo =
                     itemProducaoRepository.save(itemProducao);
 
-            // Cria a reserva e, se necessário, a necessidade de compra.
             reservaMaterialService.reservarItemProducao(itemSalvo);
+
+            if (reservaMaterialService.estaTotalmenteReservado(
+                    itemSalvo.getId())) {
+
+                itemSalvo.setStatus(StatusItemProducao.LIBERADO);
+                itemProducaoRepository.save(itemSalvo);
+            }
         }
 
         return converterParaResponse(producaoSalva);
@@ -141,6 +151,8 @@ public class ProducaoService {
         StatusProducao statusAtual = producao.getStatus();
         StatusProducao novoStatus = dto.status();
 
+        validarTransicao(statusAtual, novoStatus);
+
         if (statusAtual == StatusProducao.ENTREGUE
                 && novoStatus != StatusProducao.ENTREGUE) {
 
@@ -157,25 +169,27 @@ public class ProducaoService {
             );
         }
 
+        /*
+         * CANCELAMENTO
+         */
         if (novoStatus == StatusProducao.CANCELADO) {
 
-            if (statusAtual == StatusProducao.ENTREGUE) {
+            if (statusAtual == StatusProducao.PRONTO
+                    || statusAtual == StatusProducao.ENTREGUE) {
+
                 throw new RuntimeException(
-                        "Não é possível cancelar uma produção que já foi entregue."
+                        "Não é possível cancelar uma produção pronta ou entregue."
                 );
             }
 
-            if (statusAtual == StatusProducao.PRONTO) {
-                throw new RuntimeException(
-                        "Não é possível cancelar uma produção que já está pronta."
-                );
-            }
+            List<ItemProducao> itens = buscarItens(id);
 
             if (statusAtual == StatusProducao.AGUARDANDO) {
 
-                // Ainda não houve consumo: apenas libera as reservas.
-                List<ItemProducao> itens = buscarItens(id);
-
+                /*
+                 * Ainda não houve consumo.
+                 * Libera as reservas e cancela as necessidades abertas.
+                 */
                 for (ItemProducao item : itens) {
                     reservaMaterialService.liberarReservaProducao(
                             item.getId()
@@ -185,10 +199,10 @@ public class ProducaoService {
 
             if (statusAtual == StatusProducao.EM_PRODUCAO) {
 
-                // A produção já consumiu os materiais.
-                // Devolve cada quantidade ao estoque por movimentação.
-                List<ItemProducao> itens = buscarItens(id);
-
+                /*
+                 * A produção já consumiu os materiais.
+                 * Devolve as quantidades ao estoque.
+                 */
                 for (ItemProducao item : itens) {
 
                     int quantidade = converterQuantidade(
@@ -207,9 +221,37 @@ public class ProducaoService {
             }
         }
 
+        /*
+         * INÍCIO DA PRODUÇÃO
+         */
         if (novoStatus == StatusProducao.EM_PRODUCAO
-                && statusAtual != StatusProducao.EM_PRODUCAO) {
+                && statusAtual == StatusProducao.AGUARDANDO) {
 
+            List<ItemProducao> itens = buscarItens(id);
+
+            /*
+             * Primeiro verifica todos os itens.
+             * Nenhuma reserva será consumida se houver pendência.
+             */
+            for (ItemProducao item : itens) {
+
+                if (item.getStatus()
+                        != StatusItemProducao.LIBERADO) {
+
+                    throw new RuntimeException(
+                            "Não é possível iniciar a produção. "
+                            + "O material "
+                            + item.getMaterial().getNome()
+                            + " ainda não está totalmente disponível."
+                    );
+                }
+
+                validarQuantidade(item.getQuantidade());
+            }
+
+            /*
+             * Exige pagamento mínimo de 30%.
+             */
             BigDecimal valorPedido = pedido.getOrcamento().getValor();
 
             BigDecimal valorMinimoEntrada =
@@ -219,8 +261,7 @@ public class ProducaoService {
                     .findByPedidoId(pedido.getId())
                     .stream()
                     .filter(pagamento ->
-                            pagamento.getStatus()
-                                    == br.edu.ifpr.marcenariapro.enums.StatusPagamento.PAGO)
+                            pagamento.getStatus() == StatusPagamento.PAGO)
                     .map(Pagamento::getValor)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -231,14 +272,10 @@ public class ProducaoService {
                 );
             }
 
-            List<ItemProducao> itens = buscarItens(id);
-
-            // Valida todas as quantidades antes de consumir as reservas.
-            for (ItemProducao item : itens) {
-                validarQuantidade(item.getQuantidade());
-            }
-
-            // Consome as reservas e registra as saídas do estoque.
+            /*
+             * Todas as validações passaram.
+             * Agora consome as reservas e registra as saídas.
+             */
             for (ItemProducao item : itens) {
 
                 reservaMaterialService.consumirReservaProducao(
@@ -253,9 +290,29 @@ public class ProducaoService {
                         );
 
                 movimentacaoEstoqueService.salvar(movimentacao);
+
+                item.setStatus(StatusItemProducao.EM_PRODUCAO);
+                itemProducaoRepository.save(item);
             }
         }
 
+        /*
+         * CONCLUSÃO DA PRODUÇÃO
+         */
+        if (novoStatus == StatusProducao.PRONTO
+                && statusAtual == StatusProducao.EM_PRODUCAO) {
+
+            List<ItemProducao> itens = buscarItens(id);
+
+            for (ItemProducao item : itens) {
+                item.setStatus(StatusItemProducao.CONCLUIDO);
+                itemProducaoRepository.save(item);
+            }
+        }
+
+        /*
+         * ENTREGA
+         */
         if (novoStatus == StatusProducao.ENTREGUE) {
 
             if (statusAtual != StatusProducao.PRONTO) {
@@ -284,22 +341,18 @@ public class ProducaoService {
                 .orElseThrow(() ->
                         new RuntimeException("Produção não encontrada"));
 
-        if (producao.getStatus() == StatusProducao.EM_PRODUCAO
-                || producao.getStatus() == StatusProducao.PRONTO
-                || producao.getStatus() == StatusProducao.ENTREGUE
-                || producao.getStatus() == StatusProducao.CANCELADO) {
-
+        if (producao.getStatus() != StatusProducao.AGUARDANDO) {
             throw new RuntimeException(
-                    "Não é possível excluir uma produção que já foi iniciada, concluída ou cancelada."
+                    "Só é possível excluir uma produção que ainda está aguardando."
             );
         }
 
         List<ItemProducao> itens = buscarItens(id);
 
         for (ItemProducao item : itens) {
-                reservaMaterialService.removerReservaProducao(
-                 item.getId()
-                );
+            reservaMaterialService.removerReservaProducao(
+                    item.getId()
+            );
         }
 
         producaoRepository.delete(producao);
@@ -307,16 +360,14 @@ public class ProducaoService {
 
     private List<ItemProducao> buscarItens(Long producaoId) {
 
-        return itemProducaoRepository.findAll()
-                .stream()
-                .filter(item ->
-                        item.getProducao().getId().equals(producaoId))
-                .toList();
+        return itemProducaoRepository.findByProducaoId(producaoId);
     }
 
     private void validarQuantidade(BigDecimal quantidade) {
 
-        if (quantidade == null || quantidade.compareTo(BigDecimal.ZERO) <= 0) {
+        if (quantidade == null
+                || quantidade.compareTo(BigDecimal.ZERO) <= 0) {
+
             throw new RuntimeException(
                     "A quantidade do material precisa ser maior que zero."
             );
@@ -339,7 +390,8 @@ public class ProducaoService {
         return quantidade.intValueExact();
     }
 
-    private ProducaoResponseDTO converterParaResponse(Producao producao) {
+    private ProducaoResponseDTO converterParaResponse(
+            Producao producao) {
 
         return new ProducaoResponseDTO(
                 producao.getId(),
@@ -347,5 +399,43 @@ public class ProducaoService {
                 producao.getDataCriacao(),
                 producao.getPedido().getId()
         );
+    }
+
+    private void validarTransicao(
+            StatusProducao statusAtual,
+            StatusProducao novoStatus) {
+
+        if (novoStatus == null) {
+            throw new RuntimeException(
+                    "Informe o status da produção."
+            );
+        }
+
+        if (statusAtual == novoStatus) {
+            return;
+        }
+
+        boolean transicaoPermitida = switch (statusAtual) {
+
+            case AGUARDANDO ->
+                    novoStatus == StatusProducao.EM_PRODUCAO
+                    || novoStatus == StatusProducao.CANCELADO;
+
+            case EM_PRODUCAO ->
+                    novoStatus == StatusProducao.PRONTO
+                    || novoStatus == StatusProducao.CANCELADO;
+
+            case PRONTO ->
+                    novoStatus == StatusProducao.ENTREGUE;
+
+            case ENTREGUE, CANCELADO -> false;
+        };
+
+        if (!transicaoPermitida) {
+            throw new RuntimeException(
+                    "Transição de status inválida. "
+                    + "Verifique a sequência permitida para a produção."
+            );
+        }
     }
 }

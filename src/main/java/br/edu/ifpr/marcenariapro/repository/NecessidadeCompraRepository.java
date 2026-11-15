@@ -19,12 +19,19 @@ public interface NecessidadeCompraRepository
     List<NecessidadeCompra> findByStatus(
             StatusNecessidadeCompra status);
 
+    List<NecessidadeCompra> findByMaterialIdAndStatus(
+            Long materialId,
+            StatusNecessidadeCompra status);
+
     List<NecessidadeCompra> findByMaterialIdAndStatusIn(
             Long materialId,
             List<StatusNecessidadeCompra> status);
 
-    boolean existsByItemProducaoId(Long itemProducaoId);
+    boolean existsByItemProducaoIdAndStatus(
+            Long itemProducaoId,
+            StatusNecessidadeCompra status);
 
-    boolean existsByItemAssistenciaTecnicaId(
-            Long itemAssistenciaTecnicaId);
+    boolean existsByItemAssistenciaTecnicaIdAndStatus(
+            Long itemAssistenciaTecnicaId,
+            StatusNecessidadeCompra status);
 }

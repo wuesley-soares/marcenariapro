@@ -2,7 +2,10 @@ package br.edu.ifpr.marcenariapro.entity;
 
 import java.math.BigDecimal;
 
+import br.edu.ifpr.marcenariapro.enums.StatusItemProducao;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -20,6 +23,9 @@ public class ItemProducao {
 
     private BigDecimal quantidade;
 
+    @Enumerated(EnumType.STRING)
+    private StatusItemProducao status;
+
     @ManyToOne
     @JoinColumn(name = "producao_id")
     private Producao producao;
@@ -32,13 +38,21 @@ public class ItemProducao {
         return id;
     }
 
-  public BigDecimal getQuantidade() {
-    return quantidade;
-}
+    public BigDecimal getQuantidade() {
+        return quantidade;
+    }
 
-public void setQuantidade(BigDecimal quantidade) {
-    this.quantidade = quantidade;
-}
+    public void setQuantidade(BigDecimal quantidade) {
+        this.quantidade = quantidade;
+    }
+
+    public StatusItemProducao getStatus() {
+        return status;
+    }
+
+    public void setStatus(StatusItemProducao status) {
+        this.status = status;
+    }
 
     public Producao getProducao() {
         return producao;
