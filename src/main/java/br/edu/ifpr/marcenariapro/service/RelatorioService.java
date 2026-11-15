@@ -26,6 +26,10 @@ import br.edu.ifpr.marcenariapro.repository.PagamentoRepository;
 import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
 import br.edu.ifpr.marcenariapro.repository.ProducaoRepository;
 import br.edu.ifpr.marcenariapro.repository.ProjetoRepository;
+import br.edu.ifpr.marcenariapro.dto.RelatorioMensalResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.RelatorioPedidosMensaisResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.RelatorioMateriaisSaidaResponseDTO;
+import br.edu.ifpr.marcenariapro.repository.MovimentacaoEstoqueRepository;
 
 @Service
 public class RelatorioService {
@@ -38,6 +42,8 @@ public class RelatorioService {
     private final ProducaoRepository producaoRepository;
     private final MaterialRepository materialRepository;
     private final PagamentoRepository pagamentoRepository;
+    private final MovimentacaoEstoqueRepository movimentacaoEstoqueRepository;
+    
 
     public RelatorioService(
             ClienteRepository clienteRepository,
@@ -47,7 +53,8 @@ public class RelatorioService {
             ProducaoRepository producaoRepository,
             AssistenciaTecnicaRepository assistenciaTecnicaRepository,
             MaterialRepository materialRepository,
-            PagamentoRepository pagamentoRepository) {
+            PagamentoRepository pagamentoRepository,
+        MovimentacaoEstoqueRepository movimentacaoEstoqueRepository) {
 
         this.clienteRepository = clienteRepository;
         this.projetoRepository = projetoRepository;
@@ -57,6 +64,7 @@ public class RelatorioService {
         this.assistenciaRepository = assistenciaTecnicaRepository;
         this.materialRepository = materialRepository;
         this.pagamentoRepository = pagamentoRepository;
+        this.movimentacaoEstoqueRepository = movimentacaoEstoqueRepository;
     }
 
     private void validarPeriodo(LocalDate inicio, LocalDate fim) {
@@ -305,4 +313,109 @@ public class RelatorioService {
                 ))
                 .toList();
     }
+
+    // VENDAS MENSAIS
+
+public List<RelatorioMensalResponseDTO> vendasMensais(
+        LocalDate inicio, LocalDate fim) {
+
+    validarPeriodo(inicio, fim);
+
+    LocalDateTime dataInicio = inicio == null
+            ? null : inicioDoDia(inicio);
+
+    LocalDateTime dataFim = fim == null
+            ? null : inicioDoDiaSeguinte(fim);
+
+    return pedidoRepository.buscarVendasMensais(dataInicio, dataFim)
+            .stream()
+            .map(linha -> new RelatorioMensalResponseDTO(
+                    ((Number) linha[0]).intValue(),
+                    ((Number) linha[1]).intValue(),
+                    (BigDecimal) linha[2]
+            ))
+            .toList();
+}
+
+
+// RECEBIMENTOS MENSAIS
+
+public List<RelatorioMensalResponseDTO> recebimentosMensais(
+        LocalDate inicio, LocalDate fim) {
+
+    validarPeriodo(inicio, fim);
+
+    LocalDateTime dataInicio = inicio == null
+            ? null : inicioDoDia(inicio);
+
+    LocalDateTime dataFim = fim == null
+            ? null : inicioDoDiaSeguinte(fim);
+
+    return pagamentoRepository.buscarRecebimentosMensais(
+                    dataInicio, dataFim)
+            .stream()
+            .map(linha -> new RelatorioMensalResponseDTO(
+                    ((Number) linha[0]).intValue(),
+                    ((Number) linha[1]).intValue(),
+                    (BigDecimal) linha[2]
+            ))
+            .toList();
+}
+
+
+// EVOLUÇÃO DE PEDIDOS
+
+public List<RelatorioPedidosMensaisResponseDTO> pedidosMensais(
+        LocalDate inicio, LocalDate fim) {
+
+    validarPeriodo(inicio, fim);
+
+    LocalDateTime dataInicio = inicio == null
+            ? null : inicioDoDia(inicio);
+
+    LocalDateTime dataFim = fim == null
+            ? null : inicioDoDiaSeguinte(fim);
+
+    return pedidoRepository.buscarPedidosMensais(dataInicio, dataFim)
+            .stream()
+            .map(linha -> new RelatorioPedidosMensaisResponseDTO(
+                    ((Number) linha[0]).intValue(),
+                    ((Number) linha[1]).intValue(),
+                    ((Number) linha[2]).longValue()
+            ))
+            .toList();
+}
+
+
+// MATERIAIS COM MAIS SAÍDAS
+
+public List<RelatorioMateriaisSaidaResponseDTO> materiaisComMaisSaidas(
+        LocalDate inicio, LocalDate fim) {
+
+    validarPeriodo(inicio, fim);
+
+    LocalDateTime dataInicio = inicio == null
+            ? null : inicioDoDia(inicio);
+
+    LocalDateTime dataFim = fim == null
+            ? null : inicioDoDiaSeguinte(fim);
+
+    return movimentacaoEstoqueRepository
+            .buscarMateriaisComMaisSaidas(dataInicio, dataFim)
+            .stream()
+            .map(linha -> new RelatorioMateriaisSaidaResponseDTO(
+                    ((Number) linha[0]).longValue(),
+                    (String) linha[1],
+                    new BigDecimal(linha[2].toString())
+            ))
+            .toList();
+}
+
+
+// CONTAS A RECEBER
+
+public List<RelatorioFinanceiroResponseDTO> contasReceber() {
+
+    return financeiro(null, null);
+}
 }

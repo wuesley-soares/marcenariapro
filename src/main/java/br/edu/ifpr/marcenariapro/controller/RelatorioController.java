@@ -15,10 +15,16 @@ import org.springframework.web.server.ResponseStatusException;
 import br.edu.ifpr.marcenariapro.dto.RelatorioAssistenciaResponseDTO;
 import br.edu.ifpr.marcenariapro.dto.RelatorioEstoqueResponseDTO;
 import br.edu.ifpr.marcenariapro.dto.RelatorioFinanceiroResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.RelatorioMateriaisSaidaResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.RelatorioMensalResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.RelatorioPedidosMensaisResponseDTO;
 import br.edu.ifpr.marcenariapro.dto.RelatorioPedidosResponseDTO;
 import br.edu.ifpr.marcenariapro.dto.RelatorioProducaoResponseDTO;
 import br.edu.ifpr.marcenariapro.dto.RelatorioResumoResponseDTO;
 import br.edu.ifpr.marcenariapro.service.RelatorioService;
+import br.edu.ifpr.marcenariapro.dto.RelatorioMensalResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.RelatorioPedidosMensaisResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.RelatorioMateriaisSaidaResponseDTO;
 
 @RestController
 @RequestMapping("/relatorios")
@@ -114,4 +120,62 @@ public class RelatorioController {
         validarDatas(inicio, fim);
         return relatorioService.assistenciasPorStatus(inicio, fim);
     }
+
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+@GetMapping("/vendas-mensais")
+public List<RelatorioMensalResponseDTO> vendasMensais(
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
+
+    validarDatas(inicio, fim);
+    return relatorioService.vendasMensais(inicio, fim);
+}
+
+@PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+@GetMapping("/recebimentos-mensais")
+public List<RelatorioMensalResponseDTO> recebimentosMensais(
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
+
+    validarDatas(inicio, fim);
+    return relatorioService.recebimentosMensais(inicio, fim);
+}
+
+@PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+@GetMapping("/pedidos-mensais")
+public List<RelatorioPedidosMensaisResponseDTO> pedidosMensais(
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
+
+    validarDatas(inicio, fim);
+    return relatorioService.pedidosMensais(inicio, fim);
+}
+
+@PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+@GetMapping("/materiais-saidas")
+public List<RelatorioMateriaisSaidaResponseDTO> materiaisComMaisSaidas(
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate inicio,
+
+        @RequestParam(required = false)
+        @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fim) {
+
+    validarDatas(inicio, fim);
+    return relatorioService.materiaisComMaisSaidas(inicio, fim);
+}
+
+@PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
+@GetMapping("/contas-receber")
+public List<RelatorioFinanceiroResponseDTO> contasReceber() {
+    return relatorioService.contasReceber();
+}
 }

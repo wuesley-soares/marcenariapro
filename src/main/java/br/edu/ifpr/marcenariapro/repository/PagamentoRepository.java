@@ -37,4 +37,19 @@ public interface PagamentoRepository extends JpaRepository<Pagamento, Long> {
     BigDecimal somarPagamentosPorPeriodo(
             @Param("inicio") LocalDateTime inicio,
             @Param("fim") LocalDateTime fim);
+
+            @Query("""
+    SELECT YEAR(p.dataPagamento), MONTH(p.dataPagamento),
+           COALESCE(SUM(p.valor), 0)
+    FROM Pagamento p
+    WHERE p.status = br.edu.ifpr.marcenariapro.enums.StatusPagamento.PAGO
+      AND p.dataPagamento IS NOT NULL
+      AND (:inicio IS NULL OR p.dataPagamento >= :inicio)
+      AND (:fim IS NULL OR p.dataPagamento < :fim)
+    GROUP BY YEAR(p.dataPagamento), MONTH(p.dataPagamento)
+    ORDER BY YEAR(p.dataPagamento), MONTH(p.dataPagamento)
+    """)
+List<Object[]> buscarRecebimentosMensais(
+        @Param("inicio") LocalDateTime inicio,
+        @Param("fim") LocalDateTime fim);
 }

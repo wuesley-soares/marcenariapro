@@ -8,6 +8,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.repository.query.Param;
 
 import br.edu.ifpr.marcenariapro.entity.Pedido;
 import br.edu.ifpr.marcenariapro.enums.StatusPedido;
@@ -42,4 +43,29 @@ public interface PedidoRepository extends JpaRepository<Pedido, Long> {
     BigDecimal somarValorVendasPorPeriodo(
             @Param("inicio") LocalDateTime inicio,
             @Param("fim") LocalDateTime fim);
+
+            @Query("""
+    SELECT YEAR(p.dataCriacao), MONTH(p.dataCriacao),
+           COALESCE(SUM(p.orcamento.valor), 0)
+    FROM Pedido p
+    WHERE (:inicio IS NULL OR p.dataCriacao >= :inicio)
+      AND (:fim IS NULL OR p.dataCriacao < :fim)
+    GROUP BY YEAR(p.dataCriacao), MONTH(p.dataCriacao)
+    ORDER BY YEAR(p.dataCriacao), MONTH(p.dataCriacao)
+    """)
+List<Object[]> buscarVendasMensais(
+        @Param("inicio") LocalDateTime inicio,
+        @Param("fim") LocalDateTime fim);
+
+@Query("""
+    SELECT YEAR(p.dataCriacao), MONTH(p.dataCriacao), COUNT(p.id)
+    FROM Pedido p
+    WHERE (:inicio IS NULL OR p.dataCriacao >= :inicio)
+      AND (:fim IS NULL OR p.dataCriacao < :fim)
+    GROUP BY YEAR(p.dataCriacao), MONTH(p.dataCriacao)
+    ORDER BY YEAR(p.dataCriacao), MONTH(p.dataCriacao)
+    """)
+List<Object[]> buscarPedidosMensais(
+        @Param("inicio") LocalDateTime inicio,
+        @Param("fim") LocalDateTime fim);
 }
