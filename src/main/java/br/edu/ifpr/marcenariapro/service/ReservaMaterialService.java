@@ -176,11 +176,14 @@ public class ReservaMaterialService {
             return;
         }
 
-        List<NecessidadeCompra> necessidades =
-                necessidadeRepository.findByMaterialIdAndStatus(
-                        material.getId(),
-                        StatusNecessidadeCompra.ABERTA
-                );
+List<NecessidadeCompra> necessidades =
+        necessidadeRepository.findByMaterialIdAndStatusIn(
+                material.getId(),
+                List.of(
+                        StatusNecessidadeCompra.ABERTA,
+                        StatusNecessidadeCompra.PARCIAL
+                )
+        );
 
         necessidades.sort(
                 Comparator.comparing(NecessidadeCompra::getDataCriacao)
@@ -226,13 +229,15 @@ public class ReservaMaterialService {
                             .add(quantidadeAtender)
             );
 
-            boolean necessidadeCompleta =
-                    necessidade.getQuantidadeAtendida()
-                            .compareTo(necessidade.getQuantidadeNecessaria()) >= 0;
+    boolean necessidadeCompleta =
+        necessidade.getQuantidadeAtendida()
+                .compareTo(necessidade.getQuantidadeNecessaria()) >= 0;
 
-            if (necessidadeCompleta) {
-                necessidade.setStatus(StatusNecessidadeCompra.ATENDIDA);
-            }
+if (necessidadeCompleta) {
+    necessidade.setStatus(StatusNecessidadeCompra.ATENDIDA);
+} else {
+    necessidade.setStatus(StatusNecessidadeCompra.PARCIAL);
+}
 
             reservaRepository.save(reserva);
             necessidadeRepository.save(necessidade);
@@ -411,4 +416,17 @@ public class ReservaMaterialService {
                 .ifPresent(reserva ->
                         reservaRepository.delete(reserva));
     }
+
+    public BigDecimal calcularQuantidadeFaltante(Long itemProducaoId) {
+
+    ReservaMaterial reserva = reservaRepository
+            .findByItemProducaoId(itemProducaoId)
+            .orElseThrow(() -> new RuntimeException(
+                    "Reserva não encontrada para o item de produção."
+            ));
+
+    return reserva.getQuantidadeSolicitada()
+            .subtract(reserva.getQuantidadeReservada())
+            .max(BigDecimal.ZERO);
+}
 }
