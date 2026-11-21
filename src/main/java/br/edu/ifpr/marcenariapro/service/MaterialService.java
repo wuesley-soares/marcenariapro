@@ -8,11 +8,14 @@ import org.springframework.stereotype.Service;
 
 import br.edu.ifpr.marcenariapro.dto.MaterialRequestDTO;
 import br.edu.ifpr.marcenariapro.dto.MaterialResponseDTO;
+import br.edu.ifpr.marcenariapro.dto.MovimentacaoEstoqueRequestDTO;
 import br.edu.ifpr.marcenariapro.entity.Material;
 import br.edu.ifpr.marcenariapro.repository.ItemProducaoRepository;
 import br.edu.ifpr.marcenariapro.repository.MaterialRepository;
 import br.edu.ifpr.marcenariapro.repository.MovimentacaoEstoqueRepository;
 import br.edu.ifpr.marcenariapro.repository.SolicitacaoSubstituicaoRepository;
+import br.edu.ifpr.marcenariapro.enums.TipoMovimentacao;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MaterialService {
@@ -21,57 +24,80 @@ public class MaterialService {
     private final MovimentacaoEstoqueRepository movimentacaoEstoqueRepository;
     private final ItemProducaoRepository itemProducaoRepository;
     private final SolicitacaoSubstituicaoRepository solicitacaoSubstituicaoRepository;
+    private final MovimentacaoEstoqueService movimentacaoEstoqueService;
 
-    public MaterialService(
-            MaterialRepository materialRepository,
-            MovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
-            ItemProducaoRepository itemProducaoRepository,
-            SolicitacaoSubstituicaoRepository solicitacaoSubstituicaoRepository) {
+public MaterialService(
+        MaterialRepository materialRepository,
+        MovimentacaoEstoqueRepository movimentacaoEstoqueRepository,
+        ItemProducaoRepository itemProducaoRepository,
+        SolicitacaoSubstituicaoRepository solicitacaoSubstituicaoRepository,
+        MovimentacaoEstoqueService movimentacaoEstoqueService) {
 
-        this.materialRepository = materialRepository;
-        this.movimentacaoEstoqueRepository = movimentacaoEstoqueRepository;
-        this.itemProducaoRepository = itemProducaoRepository;
-        this.solicitacaoSubstituicaoRepository = solicitacaoSubstituicaoRepository;
+    this.materialRepository = materialRepository;
+    this.movimentacaoEstoqueRepository = movimentacaoEstoqueRepository;
+    this.itemProducaoRepository = itemProducaoRepository;
+    this.solicitacaoSubstituicaoRepository = solicitacaoSubstituicaoRepository;
+    this.movimentacaoEstoqueService = movimentacaoEstoqueService;
+}
+
+   
+@Transactional
+public MaterialResponseDTO salvar(MaterialRequestDTO dto) {
+
+    if (dto.nome() == null || dto.nome().isBlank()) {
+        throw new RuntimeException("O nome do material é obrigatório.");
     }
 
-    public MaterialResponseDTO salvar(MaterialRequestDTO dto) {
-
-        if (dto.nome() == null || dto.nome().isBlank()) {
-            throw new RuntimeException("O nome do material é obrigatório.");
-        }
-
-        if (dto.quantidade() == null
-                || dto.quantidade().compareTo(BigDecimal.ZERO) < 0) {
-            throw new RuntimeException("A quantidade do material não pode ser negativa.");
-        }
-
-        if (dto.estoqueMinimo() == null
-                || dto.estoqueMinimo().compareTo(BigDecimal.ZERO) < 0) {
-            throw new RuntimeException("O estoque mínimo não pode ser negativo.");
-        }
-
-        if (dto.valorUnitario() == null
-                || dto.valorUnitario().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new RuntimeException("O valor unitário deve ser maior que zero.");
-        }
-
-        if (dto.unidadeMedida() == null) {
-            throw new RuntimeException("A unidade de medida é obrigatória.");
-        }
-
-        Material material = new Material();
-
-        material.setNome(dto.nome());
-        material.setDescricao(dto.descricao());
-        material.setQuantidade(dto.quantidade());
-        material.setEstoqueMinimo(dto.estoqueMinimo());
-        material.setValorUnitario(dto.valorUnitario());
-        material.setUnidadeMedida(dto.unidadeMedida());
-
-        Material materialSalvo = materialRepository.save(material);
-
-        return converterParaResponse(materialSalvo);
+    if (dto.quantidade() == null
+            || dto.quantidade().compareTo(BigDecimal.ZERO) < 0) {
+        throw new RuntimeException("A quantidade não pode ser negativa.");
     }
+
+    if (dto.estoqueMinimo() == null
+            || dto.estoqueMinimo().compareTo(BigDecimal.ZERO) < 0) {
+        throw new RuntimeException("O estoque mínimo não pode ser negativo.");
+    }
+
+    if (dto.valorUnitario() == null
+            || dto.valorUnitario().compareTo(BigDecimal.ZERO) <= 0) {
+        throw new RuntimeException("O valor unitário deve ser maior que zero.");
+    }
+
+    if (dto.unidadeMedida() == null) {
+        throw new RuntimeException("A unidade de medida é obrigatória.");
+    }
+
+    // Cria o material inicialmente com estoque zero.
+    Material material = new Material();
+
+    material.setNome(dto.nome());
+    material.setDescricao(dto.descricao());
+    material.setQuantidade(BigDecimal.ZERO);
+    material.setEstoqueMinimo(dto.estoqueMinimo());
+    material.setValorUnitario(dto.valorUnitario());
+    material.setUnidadeMedida(dto.unidadeMedida());
+
+    Material materialSalvo = materialRepository.save(material);
+
+    // Registra a quantidade inicial como entrada no estoque.
+    if (dto.quantidade().compareTo(BigDecimal.ZERO) > 0) {
+
+        MovimentacaoEstoqueRequestDTO movimentacao =
+                new MovimentacaoEstoqueRequestDTO(
+                        TipoMovimentacao.ENTRADA,
+                        dto.quantidade(),
+                        materialSalvo.getId()
+                );
+
+        movimentacaoEstoqueService.salvar(movimentacao);
+    }
+
+    return converterParaResponse(
+            materialRepository.findById(materialSalvo.getId())
+                    .orElseThrow()
+    );
+}
+
 
     public List<MaterialResponseDTO> listar() {
 
