@@ -164,6 +164,16 @@ public class PedidoService {
                     "Não é possível alterar um pedido que já foi entregue.");
         }
 
+        if (dto.previsaoEntrega() == null) {
+    throw new RuntimeException(
+            "A previsão de entrega é obrigatória.");
+}
+
+if (dto.previsaoEntrega().isBefore(LocalDate.now())) {
+    throw new RuntimeException(
+            "A previsão de entrega não pode ser anterior à data atual.");
+}
+
         pedido.setStatus(dto.status());
         pedido.setPrevisaoEntrega(dto.previsaoEntrega());
 
