@@ -2,6 +2,7 @@ package br.edu.ifpr.marcenariapro.dto;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 import br.edu.ifpr.marcenariapro.enums.StatusAssistencia;
 
@@ -12,8 +13,8 @@ public record AssistenciaTecnicaRequestDTO(
         String descricao,
         LocalDate dataEntregaOriginal,
 
-        Double valorServico,
-        Double valorMateriais,
+        BigDecimal valorServico,
+        BigDecimal valorMateriais,
 
         StatusAssistencia status,
 

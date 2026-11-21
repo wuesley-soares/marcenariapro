@@ -1,7 +1,6 @@
 package br.edu.ifpr.marcenariapro.service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
@@ -216,18 +215,14 @@ public class ProducaoService {
                  */
                 for (ItemProducao item : itens) {
 
-                    int quantidade = converterQuantidade(
-                            item.getQuantidade()
-                    );
+         MovimentacaoEstoqueRequestDTO movimentacao =
+        new MovimentacaoEstoqueRequestDTO(
+                TipoMovimentacao.ENTRADA,
+                item.getQuantidade(),
+                item.getMaterial().getId()
+        );
 
-                    MovimentacaoEstoqueRequestDTO movimentacao =
-                            new MovimentacaoEstoqueRequestDTO(
-                                    TipoMovimentacao.ENTRADA,
-                                    quantidade,
-                                    item.getMaterial().getId()
-                            );
-
-                    movimentacaoEstoqueService.salvar(movimentacao);
+                   movimentacaoEstoqueService.salvar(movimentacao);
                 }
             }
         }
@@ -256,9 +251,10 @@ public class ProducaoService {
                     String detalhe;
 
                     if (faltante.compareTo(BigDecimal.ZERO) > 0) {
-                        detalhe = "faltam "
-                                + faltante.stripTrailingZeros().toPlainString()
-                                + " unidade(s)";
+                            detalhe = "faltam "
+                                    + faltante.stripTrailingZeros().toPlainString()
+                                    + " "
+                                    + item.getMaterial().getUnidadeMedida();
                     } else {
                         detalhe = "a reserva ainda não foi liberada";
                     }
@@ -308,14 +304,15 @@ public class ProducaoService {
                         item.getId()
                 );
 
-                MovimentacaoEstoqueRequestDTO movimentacao =
-                        new MovimentacaoEstoqueRequestDTO(
-                                TipoMovimentacao.SAIDA,
-                                converterQuantidade(item.getQuantidade()),
-                                item.getMaterial().getId()
-                        );
+               MovimentacaoEstoqueRequestDTO movimentacao =
+        new MovimentacaoEstoqueRequestDTO(
+                TipoMovimentacao.SAIDA,
+                item.getQuantidade(),
+                item.getMaterial().getId()
+        );
 
-                movimentacaoEstoqueService.salvar(movimentacao);
+                movimentacaoEstoqueService.registrarSaidaConsumo(movimentacao);
+
 
                 item.setStatus(StatusItemProducao.EM_PRODUCAO);
                 itemProducaoRepository.save(item);
@@ -392,34 +389,19 @@ public class ProducaoService {
         return itemProducaoRepository.findByProducaoId(producaoId);
     }
 
-    private void validarQuantidade(BigDecimal quantidade) {
+private void validarQuantidade(BigDecimal quantidade) {
 
-        if (quantidade == null
-                || quantidade.compareTo(BigDecimal.ZERO) <= 0) {
+    if (quantidade == null
+            || quantidade.compareTo(BigDecimal.ZERO) <= 0) {
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "A quantidade do material precisa ser maior que zero."
-            );
-        }
-
-        try {
-            quantidade.setScale(0, RoundingMode.UNNECESSARY);
-        } catch (ArithmeticException e) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "A quantidade do material precisa ser inteira, "
-                    + "pois o controle atual do estoque utiliza unidades inteiras."
-            );
-        }
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "A quantidade do material precisa ser maior que zero."
+        );
     }
+}
 
-    private int converterQuantidade(BigDecimal quantidade) {
-
-        validarQuantidade(quantidade);
-
-        return quantidade.intValueExact();
-    }
+ 
 
     private ProducaoResponseDTO converterParaResponse(
             Producao producao) {

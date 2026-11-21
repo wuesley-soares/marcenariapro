@@ -2,6 +2,7 @@ package br.edu.ifpr.marcenariapro.entity;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 
 import br.edu.ifpr.marcenariapro.enums.StatusAssistencia;
 import jakarta.persistence.*;
@@ -25,11 +26,14 @@ public class AssistenciaTecnica {
 
     private Boolean dentroGarantia;
 
-    private Double valorServico;
+@Column(precision = 12, scale = 2)
+private BigDecimal valorServico;
 
-    private Double valorMateriais;
+@Column(precision = 12, scale = 2)
+private BigDecimal valorMateriais;
 
-    private Double valorTotal;
+@Column(precision = 12, scale = 2)
+private BigDecimal valorTotal;
 
     @Enumerated(EnumType.STRING)
     private StatusAssistencia status;
@@ -90,29 +94,29 @@ public class AssistenciaTecnica {
         this.dentroGarantia = dentroGarantia;
     }
 
-    public Double getValorServico() {
-        return valorServico;
-    }
+   public BigDecimal getValorServico() {
+    return valorServico;
+}
 
-    public void setValorServico(Double valorServico) {
-        this.valorServico = valorServico;
-    }
+public void setValorServico(BigDecimal valorServico) {
+    this.valorServico = valorServico;
+}
 
-    public Double getValorMateriais() {
-        return valorMateriais;
-    }
+public BigDecimal getValorMateriais() {
+    return valorMateriais;
+}
 
-    public void setValorMateriais(Double valorMateriais) {
-        this.valorMateriais = valorMateriais;
-    }
+public void setValorMateriais(BigDecimal valorMateriais) {
+    this.valorMateriais = valorMateriais;
+}
 
-    public Double getValorTotal() {
-        return valorTotal;
-    }
+public BigDecimal getValorTotal() {
+    return valorTotal;
+}
 
-    public void setValorTotal(Double valorTotal) {
-        this.valorTotal = valorTotal;
-    }
+public void setValorTotal(BigDecimal valorTotal) {
+    this.valorTotal = valorTotal;
+}
 
     public StatusAssistencia getStatus() {
         return status;

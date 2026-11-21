@@ -1,12 +1,18 @@
+
 package br.edu.ifpr.marcenariapro.entity;
 
 import java.math.BigDecimal;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+
+import br.edu.ifpr.marcenariapro.enums.UnidadeMedida;
 
 @Entity
 @Table(name = "materiais")
@@ -20,11 +26,18 @@ public class Material {
 
     private String descricao;
 
-    private Integer quantidade;
+    @Column(nullable = false, precision = 12, scale = 3)
+    private BigDecimal quantidade = BigDecimal.ZERO;
 
-    private Integer estoqueMinimo;
+    @Column(nullable = false, precision = 12, scale = 3)
+    private BigDecimal estoqueMinimo = BigDecimal.ZERO;
 
+    @Column(nullable = false, precision = 12, scale = 2)
     private BigDecimal valorUnitario;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private UnidadeMedida unidadeMedida;
 
     public Long getId() {
         return id;
@@ -46,12 +59,20 @@ public class Material {
         this.descricao = descricao;
     }
 
-    public Integer getQuantidade() {
+    public BigDecimal getQuantidade() {
         return quantidade;
     }
 
-    public void setQuantidade(Integer quantidade) {
+    public void setQuantidade(BigDecimal quantidade) {
         this.quantidade = quantidade;
+    }
+
+    public BigDecimal getEstoqueMinimo() {
+        return estoqueMinimo;
+    }
+
+    public void setEstoqueMinimo(BigDecimal estoqueMinimo) {
+        this.estoqueMinimo = estoqueMinimo;
     }
 
     public BigDecimal getValorUnitario() {
@@ -62,11 +83,11 @@ public class Material {
         this.valorUnitario = valorUnitario;
     }
 
-    public Integer getEstoqueMinimo() {
-    return estoqueMinimo;
+    public UnidadeMedida getUnidadeMedida() {
+        return unidadeMedida;
     }
 
-    public void setEstoqueMinimo(Integer estoqueMinimo) {
-    this.estoqueMinimo = estoqueMinimo;
+    public void setUnidadeMedida(UnidadeMedida unidadeMedida) {
+        this.unidadeMedida = unidadeMedida;
     }
 }

@@ -168,15 +168,18 @@ public class RelatorioService {
         return materialRepository.findAll()
                 .stream()
                 .filter(material ->
-                        material.getQuantidade() <= material.getEstoqueMinimo())
+                       material.getQuantidade().compareTo(
+    material.getEstoqueMinimo()
+) <= 0)
                 .map(material ->
-                        new RelatorioEstoqueResponseDTO(
-                                material.getId(),
-                                material.getNome(),
-                                material.getQuantidade(),
-                                material.getEstoqueMinimo(),
-                                "ESTOQUE BAIXO"
-                        ))
+        new RelatorioEstoqueResponseDTO(
+                material.getId(),
+                material.getNome(),
+                material.getQuantidade(),
+                material.getEstoqueMinimo(),
+                material.getUnidadeMedida(),
+                "ESTOQUE BAIXO"
+        ))
                 .toList();
     }
 

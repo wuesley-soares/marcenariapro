@@ -64,12 +64,12 @@ public class ProducaoController {
         return ResponseEntity.ok(service.atualizar(id, dto));
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'MARCENEIRO')")
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> excluir(@PathVariable Long id) {
+    @PreAuthorize("hasRole('ADMIN')")
+@DeleteMapping("/{id}")
+public ResponseEntity<Void> excluir(@PathVariable Long id) {
 
-        service.excluir(id);
+    service.excluir(id);
 
-        return ResponseEntity.noContent().build();
-    }
+    return ResponseEntity.noContent().build();
+}
 }

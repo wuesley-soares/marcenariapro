@@ -63,7 +63,7 @@ public class ReservaMaterialService {
 
         criarReserva(
                 item.getMaterial(),
-                BigDecimal.valueOf(item.getQuantidade()),
+                item.getQuantidade(),
                 null,
                 item
         );
@@ -114,8 +114,7 @@ public class ReservaMaterialService {
 
     public BigDecimal calcularDisponivel(Material material) {
 
-        BigDecimal estoqueFisico =
-                BigDecimal.valueOf(material.getQuantidade());
+       BigDecimal estoqueFisico = material.getQuantidade();
 
         List<ReservaMaterial> reservas =
                 reservaRepository.findByMaterialIdAndStatus(
@@ -355,14 +354,16 @@ public void consumirReservaProducao(Long itemProducaoId) {
         BigDecimal faltante = reserva.getQuantidadeSolicitada()
                 .subtract(reserva.getQuantidadeReservada());
 
-        throw new ResponseStatusException(
-                HttpStatus.CONFLICT,
-                "Ainda faltam "
-                        + faltante.stripTrailingZeros().toPlainString()
-                        + " unidades do material "
-                        + reserva.getMaterial().getNome()
-                        + " para iniciar a produção."
-        );
+throw new ResponseStatusException(
+        HttpStatus.CONFLICT,
+        "Ainda faltam "
+                + faltante.stripTrailingZeros().toPlainString()
+                + " "
+                + reserva.getMaterial().getUnidadeMedida()
+                + " do material "
+                + reserva.getMaterial().getNome()
+                + " para iniciar a produção."
+);
     }
 
     reserva.setQuantidadeConsumida(

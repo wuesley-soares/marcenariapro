@@ -95,7 +95,7 @@ public class ItemProducaoService {
         MovimentacaoEstoqueRequestDTO movimentacao =
                 new MovimentacaoEstoqueRequestDTO(
                         TipoMovimentacao.SAIDA,
-                        dto.quantidade().intValueExact(),
+                        dto.quantidade(),
                         material.getId()
                 );
 
@@ -149,25 +149,16 @@ public class ItemProducaoService {
         itemProducaoRepository.delete(item);
     }
 
-    private void validarQuantidade(BigDecimal quantidade) {
+private void validarQuantidade(BigDecimal quantidade) {
 
-        if (quantidade == null
-                || quantidade.compareTo(BigDecimal.ZERO) <= 0) {
+    if (quantidade == null
+            || quantidade.compareTo(BigDecimal.ZERO) <= 0) {
 
-            throw new RuntimeException(
-                    "A quantidade deve ser maior que zero."
-            );
-        }
-
-        try {
-            quantidade.intValueExact();
-        } catch (ArithmeticException e) {
-            throw new RuntimeException(
-                    "A quantidade deve ser inteira, pois o estoque atual "
-                    + "trabalha com unidades inteiras."
-            );
-        }
+        throw new RuntimeException(
+                "A quantidade deve ser maior que zero."
+        );
     }
+}
 
     private ItemProducaoResponseDTO converterParaResponse(
             ItemProducao item) {

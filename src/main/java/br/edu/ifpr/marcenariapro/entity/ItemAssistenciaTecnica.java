@@ -1,6 +1,8 @@
-
 package br.edu.ifpr.marcenariapro.entity;
 
+import java.math.BigDecimal;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -8,7 +10,6 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import java.math.BigDecimal;
 
 @Entity
 @Table(name = "itens_assistencia_tecnica")
@@ -18,8 +19,10 @@ public class ItemAssistenciaTecnica {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Integer quantidade;
+    @Column(nullable = false, precision = 12, scale = 3)
+    private BigDecimal quantidade;
 
+    @Column(precision = 12, scale = 2)
     private BigDecimal valorUnitario;
 
     @ManyToOne
@@ -34,21 +37,21 @@ public class ItemAssistenciaTecnica {
         return id;
     }
 
-    public Integer getQuantidade() {
+    public BigDecimal getQuantidade() {
         return quantidade;
     }
 
-    public void setQuantidade(Integer quantidade) {
+    public void setQuantidade(BigDecimal quantidade) {
         this.quantidade = quantidade;
     }
 
-        public BigDecimal getValorUnitario() {
-            return valorUnitario;
-        }
+    public BigDecimal getValorUnitario() {
+        return valorUnitario;
+    }
 
-        public void setValorUnitario(BigDecimal valorUnitario) {
-            this.valorUnitario = valorUnitario;
-        }
+    public void setValorUnitario(BigDecimal valorUnitario) {
+        this.valorUnitario = valorUnitario;
+    }
 
     public AssistenciaTecnica getAssistencia() {
         return assistencia;

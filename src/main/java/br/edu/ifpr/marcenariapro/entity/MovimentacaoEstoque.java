@@ -1,8 +1,10 @@
 package br.edu.ifpr.marcenariapro.entity;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 import br.edu.ifpr.marcenariapro.enums.TipoMovimentacao;
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -24,7 +26,8 @@ public class MovimentacaoEstoque {
     @Enumerated(EnumType.STRING)
     private TipoMovimentacao tipo;
 
-    private Integer quantidade;
+    @Column(nullable = false, precision = 12, scale = 3)
+private BigDecimal quantidade;
 
     private LocalDateTime dataMovimentacao;
 
@@ -48,13 +51,13 @@ public class MovimentacaoEstoque {
         this.tipo = tipo;
     }
 
-    public Integer getQuantidade() {
-        return quantidade;
-    }
+        public BigDecimal getQuantidade() {
+            return quantidade;
+        }
 
-    public void setQuantidade(Integer quantidade) {
-        this.quantidade = quantidade;
-    }
+        public void setQuantidade(BigDecimal quantidade) {
+            this.quantidade = quantidade;
+        }
 
     public LocalDateTime getDataMovimentacao() {
         return dataMovimentacao;

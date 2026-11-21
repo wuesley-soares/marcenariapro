@@ -150,7 +150,7 @@ public class AssistenciaTecnicaController {
                 .body(arquivo);
     }
 
-    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR', 'MARCENEIRO')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'VENDEDOR')")
     @DeleteMapping("/{id}/imagens/{imagemId}")
     public void excluirImagem(
             @PathVariable Long id,

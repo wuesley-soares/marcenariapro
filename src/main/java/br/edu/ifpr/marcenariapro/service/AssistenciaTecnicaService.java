@@ -97,14 +97,27 @@ public AssistenciaTecnicaService(
             );
         }
 
+        if (dto.valorServico() != null
+        && dto.valorServico().compareTo(BigDecimal.ZERO) < 0) {
+
+    throw new RuntimeException(
+            "O valor do serviço não pode ser negativo."
+    );
+}
+
         AssistenciaTecnica assistencia = new AssistenciaTecnica();
 
         assistencia.setDataSolicitacao(dto.dataSolicitacao());
         assistencia.setDataAgendamento(dto.dataAgendamento());
         assistencia.setDescricao(dto.descricao());
         assistencia.setDataEntregaOriginal(dto.dataEntregaOriginal());
-        assistencia.setValorServico(dto.valorServico());
-        assistencia.setValorMateriais(0.0);
+        assistencia.setValorServico(
+                        dto.valorServico() != null
+                ? dto.valorServico()
+                : BigDecimal.ZERO
+);
+
+assistencia.setValorMateriais(BigDecimal.ZERO);
         assistencia.setStatus(status);
         assistencia.setCliente(cliente);
         assistencia.setPedido(pedido);
@@ -134,66 +147,71 @@ public AssistenciaTecnicaService(
         return converterParaResponse(assistencia);
     }
 
-    public AssistenciaTecnicaResponseDTO atualizar(
-            Long id,
-            AssistenciaTecnicaRequestDTO dto) {
+   
+public AssistenciaTecnicaResponseDTO atualizar(
+        Long id,
+        AssistenciaTecnicaRequestDTO dto) {
 
-        AssistenciaTecnica assistencia = buscarAssistencia(id);
+    AssistenciaTecnica assistencia = buscarAssistencia(id);
 
-        validarDataEntrega(dto.dataEntregaOriginal());
+    validarDataEntrega(dto.dataEntregaOriginal());
 
-        Cliente cliente = clienteRepository.findById(dto.clienteId())
+    Cliente cliente = clienteRepository.findById(dto.clienteId())
+            .orElseThrow(() ->
+                    new RuntimeException("Cliente não encontrado"));
+
+    Pedido pedido = null;
+
+    if (dto.pedidoId() != null) {
+        pedido = pedidoRepository.findById(dto.pedidoId())
                 .orElseThrow(() ->
-                        new RuntimeException("Cliente não encontrado"));
+                        new RuntimeException("Pedido não encontrado"));
+    }
 
-        Pedido pedido = null;
+    Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
+            .orElseThrow(() ->
+                    new RuntimeException("Funcionário não encontrado"));
 
-        if (dto.pedidoId() != null) {
-            pedido = pedidoRepository.findById(dto.pedidoId())
-                    .orElseThrow(() ->
-                            new RuntimeException("Pedido não encontrado"));
-        }
+    if (assistencia.getStatus() == StatusAssistencia.CONCLUIDA
+            || assistencia.getStatus() == StatusAssistencia.CANCELADA) {
 
-        Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
-                .orElseThrow(() ->
-                        new RuntimeException("Funcionário não encontrado"));
-
-        if (assistencia.getStatus() == StatusAssistencia.CONCLUIDA
-                || assistencia.getStatus() == StatusAssistencia.CANCELADA) {
-
-            throw new RuntimeException(
-                    "Não é possível editar uma assistência concluída ou cancelada."
-            );
-        }
-
-        assistencia.setDataSolicitacao(dto.dataSolicitacao());
-        assistencia.setDataAgendamento(dto.dataAgendamento());
-        assistencia.setDescricao(dto.descricao());
-        assistencia.setDataEntregaOriginal(dto.dataEntregaOriginal());
-        assistencia.setCliente(cliente);
-        assistencia.setPedido(pedido);
-        assistencia.setFuncionario(funcionario);
-
-        if (dto.valorServico() != null && dto.valorServico() < 0) {
-            throw new RuntimeException(
-                    "O valor do serviço não pode ser negativo."
-            );
-        }
-
-        assistencia.setValorServico(dto.valorServico());
-
-        if (dto.status() != null
-                && dto.status() != assistencia.getStatus()) {
-
-            alterarStatus(assistencia, dto.status());
-        }
-
-        calcularValorMateriais(assistencia);
-
-        return converterParaResponse(
-                assistenciaRepository.save(assistencia)
+        throw new RuntimeException(
+                "Não é possível editar uma assistência concluída ou cancelada."
         );
     }
+
+    if (dto.valorServico() != null
+            && dto.valorServico().compareTo(BigDecimal.ZERO) < 0) {
+
+        throw new RuntimeException(
+                "O valor do serviço não pode ser negativo."
+        );
+    }
+
+    assistencia.setDataSolicitacao(dto.dataSolicitacao());
+    assistencia.setDataAgendamento(dto.dataAgendamento());
+    assistencia.setDescricao(dto.descricao());
+    assistencia.setDataEntregaOriginal(dto.dataEntregaOriginal());
+    assistencia.setCliente(cliente);
+    assistencia.setPedido(pedido);
+    assistencia.setFuncionario(funcionario);
+
+    if (dto.valorServico() != null) {
+        assistencia.setValorServico(dto.valorServico());
+    }
+
+    if (dto.status() != null
+            && dto.status() != assistencia.getStatus()) {
+
+        alterarStatus(assistencia, dto.status());
+    }
+
+    calcularValorMateriais(assistencia);
+
+    return converterParaResponse(
+            assistenciaRepository.save(assistencia)
+    );
+}
 
     public ItemAssistenciaTecnicaResponseDTO adicionarMaterial(
             Long assistenciaId,
@@ -203,7 +221,8 @@ public AssistenciaTecnicaService(
 
         validarPermissaoAlterarMateriais(assistencia);
 
-        if (dto.quantidade() == null || dto.quantidade() <= 0) {
+        if (dto.quantidade() == null
+        || dto.quantidade().compareTo(BigDecimal.ZERO) <= 0) {
             throw new RuntimeException(
                     "A quantidade deve ser maior que zero."
             );
@@ -374,13 +393,13 @@ public AssistenciaTecnicaService(
                     item.getId()
             );
 
-            movimentacaoEstoqueService.salvar(
-                    new MovimentacaoEstoqueRequestDTO(
-                            TipoMovimentacao.SAIDA,
-                            item.getQuantidade(),
-                            item.getMaterial().getId()
-                    )
-            );
+    movimentacaoEstoqueService.registrarSaidaConsumo(
+        new MovimentacaoEstoqueRequestDTO(
+                TipoMovimentacao.SAIDA,
+                item.getQuantidade(),
+                item.getMaterial().getId()
+        )
+);
         }
     }
 
@@ -451,63 +470,65 @@ public AssistenciaTecnicaService(
         }
     }
 
-    private void calcularValorMateriais(
-            AssistenciaTecnica assistencia) {
+   private void calcularValorMateriais(
+        AssistenciaTecnica assistencia) {
 
-        List<ItemAssistenciaTecnica> itens =
-                itemAssistenciaRepository.findByAssistenciaId(
-                        assistencia.getId()
-                );
+    List<ItemAssistenciaTecnica> itens =
+            itemAssistenciaRepository.findByAssistenciaId(
+                    assistencia.getId()
+            );
 
-        BigDecimal total = BigDecimal.ZERO;
+    BigDecimal total = BigDecimal.ZERO;
 
-        for (ItemAssistenciaTecnica item : itens) {
+    for (ItemAssistenciaTecnica item : itens) {
 
-            BigDecimal quantidade =
-                    BigDecimal.valueOf(item.getQuantidade());
-BigDecimal valor = item.getValorUnitario() != null
-        ? item.getValorUnitario()
-        : BigDecimal.ZERO;
+        BigDecimal quantidade =
+                item.getQuantidade();
 
-            if (valor != null) {
-                total = total.add(quantidade.multiply(valor));
-            }
-        }
+        BigDecimal valor = item.getValorUnitario() != null
+                ? item.getValorUnitario()
+                : BigDecimal.ZERO;
 
-        assistencia.setValorMateriais(total.doubleValue());
-
-        verificarGarantia(assistencia);
+        total = total.add(quantidade.multiply(valor));
     }
 
-    private void verificarGarantia(
-            AssistenciaTecnica assistencia) {
+    assistencia.setValorMateriais(total);
 
-        validarDataEntrega(assistencia.getDataEntregaOriginal());
+    verificarGarantia(assistencia);
+}
 
-        LocalDate limite =
-                assistencia.getDataEntregaOriginal().plusYears(2);
+private void verificarGarantia(
+        AssistenciaTecnica assistencia) {
 
-        boolean dentro =
-                !LocalDate.now().isAfter(limite);
+    validarDataEntrega(assistencia.getDataEntregaOriginal());
 
-        assistencia.setDentroGarantia(dentro);
+    LocalDate limite =
+            assistencia.getDataEntregaOriginal().plusYears(2);
 
-        Double materiais = assistencia.getValorMateriais() == null
-                ? 0.0
-                : assistencia.getValorMateriais();
+    boolean dentro =
+            !LocalDate.now().isAfter(limite);
 
-        Double servico = assistencia.getValorServico() == null
-                ? 0.0
-                : assistencia.getValorServico();
+    assistencia.setDentroGarantia(dentro);
 
-        if (dentro) {
-            servico = 0.0;
-        }
+    BigDecimal materiais = assistencia.getValorMateriais() != null
+            ? assistencia.getValorMateriais()
+            : BigDecimal.ZERO;
 
-        assistencia.setValorServico(servico);
-        assistencia.setValorMateriais(materiais);
-        assistencia.setValorTotal(servico + materiais);
+    BigDecimal servico = assistencia.getValorServico() != null
+            ? assistencia.getValorServico()
+            : BigDecimal.ZERO;
+
+    if (dentro) {
+        servico = BigDecimal.ZERO;
     }
+
+    assistencia.setValorServico(servico);
+    assistencia.setValorMateriais(materiais);
+
+    assistencia.setValorTotal(
+            servico.add(materiais)
+    );
+}
 
     private ItemAssistenciaTecnicaResponseDTO converterItemParaResponse(
             ItemAssistenciaTecnica item) {

@@ -2,14 +2,14 @@ package br.edu.ifpr.marcenariapro.dto;
 
 import java.math.BigDecimal;
 
-public record MaterialRequestDTO(
+import br.edu.ifpr.marcenariapro.enums.UnidadeMedida;
 
+public record MaterialRequestDTO(
     String nome,
     String descricao,
-    Integer quantidade,
-    Integer estoqueMinimo,
-    BigDecimal valorUnitario
-    
-
+    BigDecimal quantidade,
+    BigDecimal estoqueMinimo,
+    BigDecimal valorUnitario,
+    UnidadeMedida unidadeMedida
 ) {
 }

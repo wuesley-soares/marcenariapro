@@ -1,4 +1,3 @@
-
 package br.edu.ifpr.marcenariapro.service;
 
 import java.math.BigDecimal;
@@ -34,73 +33,189 @@ public class MovimentacaoEstoqueService {
         this.reservaMaterialService = reservaMaterialService;
     }
 
+    /*
+     * Movimentação normal:
+     * - ENTRADA: aumenta o estoque físico.
+     * - SAIDA: verifica o estoque disponível, descontando reservas.
+     *
+     * Continua sendo utilizada pela tela de movimentações
+     * e pelas entradas de devolução.
+     */
     @Transactional
     public MovimentacaoEstoqueResponseDTO salvar(
             MovimentacaoEstoqueRequestDTO dto) {
 
-        if (dto.tipo() == null || dto.materialId() == null
-                || dto.quantidade() == null || dto.quantidade() <= 0) {
+        validarMovimentacao(dto);
 
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Informe o tipo, o material e uma quantidade maior que zero."
-            );
-        }
-
-        Material material = materialRepository.findById(dto.materialId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND,
-                        "Material não encontrado."
-                ));
+        Material material = buscarMaterial(dto.materialId());
 
         if (dto.tipo() == TipoMovimentacao.SAIDA) {
 
             BigDecimal disponivel =
                     reservaMaterialService.calcularDisponivel(material);
 
-            if (disponivel.compareTo(
-                    BigDecimal.valueOf(dto.quantidade())) < 0) {
+            if (disponivel.compareTo(dto.quantidade()) < 0) {
 
                 throw new ResponseStatusException(
                         HttpStatus.BAD_REQUEST,
-                        "Estoque disponível insuficiente. Existem materiais reservados."
+                        "Estoque disponível insuficiente. "
+                        + "Existem materiais reservados."
                 );
             }
 
-            material.setQuantidade(
-                    material.getQuantidade() - dto.quantidade()
+            return registrarSaidaFisica(
+                    material,
+                    dto.quantidade()
             );
         }
 
         if (dto.tipo() == TipoMovimentacao.ENTRADA) {
 
-            material.setQuantidade(
-                    material.getQuantidade() + dto.quantidade()
+            return registrarEntradaFisica(
+                    material,
+                    dto.quantidade(),
+                    true
             );
         }
+
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Tipo de movimentação inválido."
+        );
+    }
+
+    /*
+     * Saída originada do consumo de uma reserva.
+     *
+     * Utilizada pela produção e pela assistência técnica.
+     * A reserva deve ser consumida e validada antes desta chamada.
+     */
+    @Transactional
+    public MovimentacaoEstoqueResponseDTO registrarSaidaConsumo(
+            MovimentacaoEstoqueRequestDTO dto) {
+
+        validarMovimentacao(dto);
+
+        if (dto.tipo() != TipoMovimentacao.SAIDA) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Esta operação aceita somente saídas."
+            );
+        }
+
+        Material material = buscarMaterial(dto.materialId());
+
+        // Confere o estoque físico, sem descontar novamente as reservas.
+        if (material.getQuantidade().compareTo(dto.quantidade()) < 0) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Estoque físico insuficiente para registrar o consumo "
+                    + "do material: " + material.getNome()
+            );
+        }
+
+        return registrarSaidaFisica(
+                material,
+                dto.quantidade()
+        );
+    }
+
+    /*
+     * Registra a saída física e salva o histórico.
+     */
+    private MovimentacaoEstoqueResponseDTO registrarSaidaFisica(
+            Material material,
+            BigDecimal quantidade) {
+
+        material.setQuantidade(
+                material.getQuantidade().subtract(quantidade)
+        );
 
         materialRepository.save(material);
 
         MovimentacaoEstoque movimentacao = new MovimentacaoEstoque();
 
-        movimentacao.setTipo(dto.tipo());
-        movimentacao.setQuantidade(dto.quantidade());
+        movimentacao.setTipo(TipoMovimentacao.SAIDA);
+        movimentacao.setQuantidade(quantidade);
         movimentacao.setMaterial(material);
 
-        MovimentacaoEstoque movimentacaoSalva =
+        MovimentacaoEstoque salva =
                 movimentacaoRepository.save(movimentacao);
 
-        if (dto.tipo() == TipoMovimentacao.ENTRADA) {
+        return converterParaResponse(salva);
+    }
+
+    /*
+     * Registra uma entrada física.
+     *
+     * atenderNecessidades indica se a entrada deve ser distribuída
+     * entre as necessidades de compra pendentes.
+     */
+    private MovimentacaoEstoqueResponseDTO registrarEntradaFisica(
+            Material material,
+            BigDecimal quantidade,
+            boolean atenderNecessidades) {
+
+        material.setQuantidade(
+                material.getQuantidade().add(quantidade)
+        );
+
+        materialRepository.save(material);
+
+        MovimentacaoEstoque movimentacao = new MovimentacaoEstoque();
+
+        movimentacao.setTipo(TipoMovimentacao.ENTRADA);
+        movimentacao.setQuantidade(quantidade);
+        movimentacao.setMaterial(material);
+
+        MovimentacaoEstoque salva =
+                movimentacaoRepository.save(movimentacao);
+
+        if (atenderNecessidades) {
 
             reservaMaterialService.atenderNecessidadesCompra(
                     material,
-                    BigDecimal.valueOf(dto.quantidade())
+                    quantidade
             );
         }
 
-        return converterParaResponse(movimentacaoSalva);
+        return converterParaResponse(salva);
     }
 
+    /*
+     * Busca material pelo ID.
+     */
+    private Material buscarMaterial(Long materialId) {
+
+        return materialRepository.findById(materialId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Material não encontrado."
+                ));
+    }
+
+    /*
+     * Valida os dados da movimentação.
+     */
+    private void validarMovimentacao(
+            MovimentacaoEstoqueRequestDTO dto) {
+
+        if (dto == null
+                || dto.tipo() == null
+                || dto.materialId() == null
+                || dto.quantidade() == null
+                || dto.quantidade().compareTo(BigDecimal.ZERO) <= 0) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Informe o tipo, o material e uma quantidade maior que zero."
+            );
+        }
+    }
+
+    @Transactional(readOnly = true)
     public List<MovimentacaoEstoqueResponseDTO> listar() {
 
         return movimentacaoRepository.findAll()
@@ -112,6 +227,7 @@ public class MovimentacaoEstoqueService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
     public MovimentacaoEstoqueResponseDTO buscarPorId(Long id) {
 
         MovimentacaoEstoque movimentacao =
@@ -150,4 +266,27 @@ public class MovimentacaoEstoqueService {
                 movimentacao.getMaterial().getNome()
         );
     }
+
+    @Transactional
+public MovimentacaoEstoqueResponseDTO registrarEntradaDevolucao(
+        MovimentacaoEstoqueRequestDTO dto) {
+
+    validarMovimentacao(dto);
+
+    if (dto.tipo() != TipoMovimentacao.ENTRADA) {
+
+        throw new ResponseStatusException(
+                HttpStatus.BAD_REQUEST,
+                "Esta operação aceita somente entradas."
+        );
+    }
+
+    Material material = buscarMaterial(dto.materialId());
+
+    return registrarEntradaFisica(
+            material,
+            dto.quantidade(),
+            false
+    );
+}
 }
