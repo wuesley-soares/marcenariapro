@@ -1,3 +1,4 @@
+
 package br.edu.ifpr.marcenariapro.dto;
 
 import java.time.LocalDate;
@@ -18,7 +19,6 @@ public record AssistenciaTecnicaResponseDTO(
         BigDecimal valorTotal,
         StatusAssistencia status,
         Long clienteId,
-        Long pedidoId,
-        Long funcionarioId
+        Long pedidoId
 ) {
 }

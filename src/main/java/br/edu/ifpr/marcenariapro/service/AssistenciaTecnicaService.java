@@ -17,7 +17,7 @@ import br.edu.ifpr.marcenariapro.entity.Cliente;
 import br.edu.ifpr.marcenariapro.entity.ItemAssistenciaTecnica;
 import br.edu.ifpr.marcenariapro.entity.Material;
 import br.edu.ifpr.marcenariapro.entity.Pedido;
-import br.edu.ifpr.marcenariapro.entity.Usuario;
+
 import br.edu.ifpr.marcenariapro.enums.StatusAssistencia;
 import br.edu.ifpr.marcenariapro.enums.TipoMovimentacao;
 import br.edu.ifpr.marcenariapro.repository.AssistenciaTecnicaRepository;
@@ -26,6 +26,7 @@ import br.edu.ifpr.marcenariapro.repository.ItemAssistenciaTecnicaRepository;
 import br.edu.ifpr.marcenariapro.repository.MaterialRepository;
 import br.edu.ifpr.marcenariapro.repository.PedidoRepository;
 import br.edu.ifpr.marcenariapro.repository.UsuarioRepository;
+
 
 @Service
 @Transactional
@@ -36,8 +37,7 @@ private final ImagemAssistenciaTecnicaService imagemAssistenciaTecnicaService;
     private final AssistenciaTecnicaRepository assistenciaRepository;
     private final ClienteRepository clienteRepository;
     private final PedidoRepository pedidoRepository;
-    private final UsuarioRepository usuarioRepository;
-    private final ItemAssistenciaTecnicaRepository itemAssistenciaRepository;
+     private final ItemAssistenciaTecnicaRepository itemAssistenciaRepository;
     private final MaterialRepository materialRepository;
     private final ReservaMaterialService reservaMaterialService;
     private final MovimentacaoEstoqueService movimentacaoEstoqueService;
@@ -46,7 +46,6 @@ public AssistenciaTecnicaService(
         AssistenciaTecnicaRepository assistenciaRepository,
         ClienteRepository clienteRepository,
         PedidoRepository pedidoRepository,
-        UsuarioRepository usuarioRepository,
         ItemAssistenciaTecnicaRepository itemAssistenciaRepository,
         MaterialRepository materialRepository,
         ReservaMaterialService reservaMaterialService,
@@ -56,7 +55,6 @@ public AssistenciaTecnicaService(
     this.assistenciaRepository = assistenciaRepository;
     this.clienteRepository = clienteRepository;
     this.pedidoRepository = pedidoRepository;
-    this.usuarioRepository = usuarioRepository;
     this.itemAssistenciaRepository = itemAssistenciaRepository;
     this.materialRepository = materialRepository;
     this.reservaMaterialService = reservaMaterialService;
@@ -81,9 +79,7 @@ public AssistenciaTecnicaService(
                             new RuntimeException("Pedido não encontrado"));
         }
 
-        Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
-                .orElseThrow(() ->
-                        new RuntimeException("Funcionário não encontrado"));
+
 
         StatusAssistencia status = dto.status() == null
                 ? StatusAssistencia.ABERTA
@@ -121,7 +117,7 @@ assistencia.setValorMateriais(BigDecimal.ZERO);
         assistencia.setStatus(status);
         assistencia.setCliente(cliente);
         assistencia.setPedido(pedido);
-        assistencia.setFuncionario(funcionario);
+        
 
         verificarGarantia(assistencia);
 
@@ -168,9 +164,7 @@ public AssistenciaTecnicaResponseDTO atualizar(
                         new RuntimeException("Pedido não encontrado"));
     }
 
-    Usuario funcionario = usuarioRepository.findById(dto.funcionarioId())
-            .orElseThrow(() ->
-                    new RuntimeException("Funcionário não encontrado"));
+ 
 
     if (assistencia.getStatus() == StatusAssistencia.CONCLUIDA
             || assistencia.getStatus() == StatusAssistencia.CANCELADA) {
@@ -194,7 +188,7 @@ public AssistenciaTecnicaResponseDTO atualizar(
     assistencia.setDataEntregaOriginal(dto.dataEntregaOriginal());
     assistencia.setCliente(cliente);
     assistencia.setPedido(pedido);
-    assistencia.setFuncionario(funcionario);
+    
 
     if (dto.valorServico() != null) {
         assistencia.setValorServico(dto.valorServico());
@@ -541,25 +535,24 @@ private void verificarGarantia(
         );
     }
 
-    private AssistenciaTecnicaResponseDTO converterParaResponse(
-            AssistenciaTecnica assistencia) {
+   private AssistenciaTecnicaResponseDTO converterParaResponse(
+        AssistenciaTecnica assistencia) {
 
-        return new AssistenciaTecnicaResponseDTO(
-                assistencia.getId(),
-                assistencia.getDataSolicitacao(),
-                assistencia.getDataAgendamento(),
-                assistencia.getDescricao(),
-                assistencia.getDataEntregaOriginal(),
-                assistencia.getDentroGarantia(),
-                assistencia.getValorServico(),
-                assistencia.getValorMateriais(),
-                assistencia.getValorTotal(),
-                assistencia.getStatus(),
-                assistencia.getCliente().getId(),
-                assistencia.getPedido() != null
-                        ? assistencia.getPedido().getId()
-                        : null,
-                assistencia.getFuncionario().getId()
-        );
-    }
+    return new AssistenciaTecnicaResponseDTO(
+            assistencia.getId(),
+            assistencia.getDataSolicitacao(),
+            assistencia.getDataAgendamento(),
+            assistencia.getDescricao(),
+            assistencia.getDataEntregaOriginal(),
+            assistencia.getDentroGarantia(),
+            assistencia.getValorServico(),
+            assistencia.getValorMateriais(),
+            assistencia.getValorTotal(),
+            assistencia.getStatus(),
+            assistencia.getCliente().getId(),
+            assistencia.getPedido() != null
+                    ? assistencia.getPedido().getId()
+                    : null
+    );
+}
 }

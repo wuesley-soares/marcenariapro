@@ -1,3 +1,4 @@
+
 package br.edu.ifpr.marcenariapro.entity;
 
 import java.time.LocalDate;
@@ -16,24 +17,22 @@ public class AssistenciaTecnica {
     private Long id;
 
     private LocalDate dataSolicitacao;
-
     private LocalDateTime dataAgendamento;
 
     @Column(columnDefinition = "TEXT")
     private String descricao;
 
     private LocalDate dataEntregaOriginal;
-
     private Boolean dentroGarantia;
 
-@Column(precision = 12, scale = 2)
-private BigDecimal valorServico;
+    @Column(precision = 12, scale = 2)
+    private BigDecimal valorServico;
 
-@Column(precision = 12, scale = 2)
-private BigDecimal valorMateriais;
+    @Column(precision = 12, scale = 2)
+    private BigDecimal valorMateriais;
 
-@Column(precision = 12, scale = 2)
-private BigDecimal valorTotal;
+    @Column(precision = 12, scale = 2)
+    private BigDecimal valorTotal;
 
     @Enumerated(EnumType.STRING)
     private StatusAssistencia status;
@@ -45,10 +44,6 @@ private BigDecimal valorTotal;
     @ManyToOne
     @JoinColumn(name = "pedido_id")
     private Pedido pedido;
-
-    @ManyToOne
-    @JoinColumn(name = "funcionario_id")
-    private Usuario funcionario;
 
     public Long getId() {
         return id;
@@ -94,29 +89,29 @@ private BigDecimal valorTotal;
         this.dentroGarantia = dentroGarantia;
     }
 
-   public BigDecimal getValorServico() {
-    return valorServico;
-}
+    public BigDecimal getValorServico() {
+        return valorServico;
+    }
 
-public void setValorServico(BigDecimal valorServico) {
-    this.valorServico = valorServico;
-}
+    public void setValorServico(BigDecimal valorServico) {
+        this.valorServico = valorServico;
+    }
 
-public BigDecimal getValorMateriais() {
-    return valorMateriais;
-}
+    public BigDecimal getValorMateriais() {
+        return valorMateriais;
+    }
 
-public void setValorMateriais(BigDecimal valorMateriais) {
-    this.valorMateriais = valorMateriais;
-}
+    public void setValorMateriais(BigDecimal valorMateriais) {
+        this.valorMateriais = valorMateriais;
+    }
 
-public BigDecimal getValorTotal() {
-    return valorTotal;
-}
+    public BigDecimal getValorTotal() {
+        return valorTotal;
+    }
 
-public void setValorTotal(BigDecimal valorTotal) {
-    this.valorTotal = valorTotal;
-}
+    public void setValorTotal(BigDecimal valorTotal) {
+        this.valorTotal = valorTotal;
+    }
 
     public StatusAssistencia getStatus() {
         return status;
@@ -140,13 +135,5 @@ public void setValorTotal(BigDecimal valorTotal) {
 
     public void setPedido(Pedido pedido) {
         this.pedido = pedido;
-    }
-
-    public Usuario getFuncionario() {
-        return funcionario;
-    }
-
-    public void setFuncionario(Usuario funcionario) {
-        this.funcionario = funcionario;
     }
 }
