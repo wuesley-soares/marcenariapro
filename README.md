@@ -2868,7 +2868,7 @@ Recomenda-se realizar os seguintes passos antes da apresentação ou avaliação
 
 Clonar o repositório:
 
-git clone URL_DO_REPOSITORIO
+git clone https://github.com/wuesley-soares/marcenariapro.git
 
 cd marcenariapro
 
